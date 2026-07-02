@@ -1216,7 +1216,7 @@ function renderCots() {
       </div>
       <div class="q-meta">
         <span>🚗 ${escHtml(c.vehiculo)}</span>
-        <span>📋 ${c.placa||'—'}</span>
+        <span>📋 ${c.placa||'—'}${itvBadge(c.placa)}</span>
         <span>📅 ${fmtDate(c.fecha)}</span>
       </div>
       <div class="q-tipo">${escHtml(c.tipo||'—')}</div>
@@ -1238,7 +1238,7 @@ function renderClients() {
         <div class="avatar">${c.nombre.charAt(0).toUpperCase()}</div>
         <div style="flex:1">
           <div class="client-name">${escHtml(c.nombre)}</div>
-          <div class="client-meta">${escHtml(c.vehiculo||'—')} · ${escHtml(c.placa||'—')}</div>
+          <div class="client-meta">${escHtml(c.vehiculo||'—')} · ${escHtml(c.placa||'—')}${itvBadge(c.placa)}</div>
           ${c.tel?`<div class="client-meta" style="margin-top:2px">📞 ${escHtml(c.tel)}</div>`:''}
         </div>
       </div>
@@ -1332,6 +1332,7 @@ function openDetail(id) {
         <div class="info-item"><div class="key">Tipo</div><div class="val">${escHtml(c.tipo||'—')}</div></div>
       </div>
     </div>
+    ${itvDetailPanel(c.placa)}
 
     <div class="card mb14">
       <div class="section-label" style="margin-bottom:10px">detalle</div>
@@ -1425,6 +1426,7 @@ function openClientDetail(nombre) {
       </div>
     </div>
 
+    ${itvDetailPanel(cots[0]?.placa||'')}
     <button class="btn btn-primary btn-full mb14" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(ultimoVehiculo)}','${escHtml(ultimaPlaca)}')">
       ➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])}
     </button>
@@ -2032,6 +2034,72 @@ function copyCitaWA(id) {
   copyFallback(el.textContent);
 }
 
+
+
+// ══════════════════════════════════════
+// ITV – INSPECCIÓN TÉCNICA VEHICULAR
+// Calendario CR: último dígito de placa = mes
+// 1→Ene, 2→Feb, 3→Mar, 4→Abr, 5→May, 6→Jun
+// 7→Jul, 8→Ago, 9→Set, 0→Oct
+// Noviembre y Diciembre: rezagados (sin dígito asignado)
+// ══════════════════════════════════════
+const ITV_MAP = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:9, 0:10};
+const ITV_MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Setiembre','Octubre','Noviembre','Diciembre'];
+
+function getUltimoDigitoPlaca(placa) {
+  if(!placa) return null;
+  // Extract digits only and get the last one
+  const digits = placa.replace(/[^0-9]/g,'');
+  if(!digits.length) return null;
+  return parseInt(digits[digits.length - 1]);
+}
+
+function itvInfo(placa) {
+  const digit = getUltimoDigitoPlaca(placa);
+  if(digit === null) return null;
+  const mesITV = ITV_MAP[digit]; // 1–10 or undefined
+  if(!mesITV) return null;
+  const now = new Date();
+  const mesActual = now.getMonth() + 1; // 1–12
+  const esEsteMes = mesActual === mesITV;
+  const esMesSiguiente = mesActual + 1 === mesITV || (mesActual === 12 && mesITV === 1);
+  return { digit, mesITV, mesNombre: ITV_MESES[mesITV], esEsteMes, esMesSiguiente };
+}
+
+function itvBadge(placa) {
+  const info = itvInfo(placa);
+  if(!info) return '';
+  if(info.esEsteMes) return '<span style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px">🔴 ITV este mes</span>';
+  if(info.esMesSiguiente) return '<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px">🟡 ITV próximo mes</span>';
+  return '';
+}
+
+function itvDetailPanel(placa) {
+  const info = itvInfo(placa);
+  if(!info) return '';
+  const now = new Date();
+  const mesActual = now.getMonth() + 1;
+
+  let color, icon, msg;
+  if(info.esEsteMes) {
+    color = '#fee2e2'; icon = '🔴';
+    msg = `Su vehículo (placa terminada en <strong>${info.digit}</strong>) debe pasar la revisión en <strong>${info.mesNombre}</strong>. ¡Este es el mes!`;
+  } else if(info.esMesSiguiente) {
+    color = '#fef3c7'; icon = '🟡';
+    msg = `Su vehículo (placa terminada en <strong>${info.digit}</strong>) debe pasar la revisión en <strong>${info.mesNombre}</strong>. El próximo mes.`;
+  } else {
+    color = 'var(--surface2)'; icon = '📋';
+    msg = `Placa terminada en <strong>${info.digit}</strong> → revisión en <strong>${info.mesNombre}</strong>.`;
+  }
+
+  return `<div style="background:${color};border-radius:10px;padding:11px 13px;margin-bottom:12px;font-size:13px;line-height:1.6">
+    ${icon} <strong>Inspección Técnica Vehicular (ITV)</strong><br>${msg}
+    <div style="margin-top:6px">
+      <a href="https://www.itv.co.cr" target="_blank" style="color:#1d4ed8;font-size:12px;font-weight:600">Agendar cita en ITV →</a>
+    </div>
+  </div>`;
+}
 
 // ── DARK MODE ──
 function toggleDark() {

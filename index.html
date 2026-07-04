@@ -128,6 +128,9 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
 .chip { background: var(--surface); border: 1.5px solid var(--border2); border-radius: 20px; padding: 6px 13px; font-size: 13px; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .chip:active, .chip.sel { background: #fff0f0; border-color: var(--red); color: var(--red); font-weight: 600; }
+.chip.sub { background: var(--surface2); font-size: 12px; padding: 5px 11px; }
+.chip.sub:active { background: #fff0f0; border-color: var(--red); color: var(--red); }
+.submenu { background: var(--surface2); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--border); }
 
 /* ── ITEMS ── */
 .item-row { display: grid; grid-template-columns: 1fr 70px 90px 28px; gap: 7px; align-items: center; margin-bottom: 8px; }
@@ -355,14 +358,63 @@ if ('serviceWorker' in navigator) {
     <!-- TAB: NUEVA COTIZACIÓN -->
     <div class="content tab active" id="tab-nueva">
       <div class="section-label">accesos rápidos</div>
+      <!-- Categorías principales -->
       <div class="chips" id="quick-chips">
-        <div class="chip" onclick="quickFill(this,'Cambio de aceite y filtros')">🛢 Aceite</div>
-        <div class="chip" onclick="quickFill(this,'Frenos – pastillas y discos')">⭕ Frenos</div>
-        <div class="chip" onclick="quickFill(this,'Revisión de suspensión')">🚗 Suspensión</div>
+        <div class="chip" onclick="toggleSubMenu('aceite',this)">🛢 Aceite y filtros</div>
+        <div class="chip" onclick="toggleSubMenu('frenos',this)">⭕ Frenos</div>
+        <div class="chip" onclick="toggleSubMenu('suspension',this)">🚗 Suspensión</div>
         <div class="chip" onclick="quickFill(this,'Batería')">⚡ Batería</div>
         <div class="chip" onclick="quickFill(this,'Diagnóstico computarizado')">💻 Diagnóstico</div>
-        <div class="chip" onclick="quickFill(this,'Alineación y balanceo')">🎯 Alineación</div>
-        <div class="chip" onclick="quickFill(this,'Revisión general')">🔍 Revisión general</div>
+        <div class="chip" onclick="toggleSubMenu('otros',this)">🔧 Más...</div>
+      </div>
+
+      <!-- Submenús por categoría -->
+      <div id="submenu-aceite" class="submenu" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">ACEITE Y FILTROS — elegí el trabajo:</div>
+        <div class="chips">
+          <div class="chip sub" onclick="quickFillSub('Cambio de aceite y filtro de motor')">🛢 Aceite + filtro motor</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de filtro de aire')">💨 Filtro de aire</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de filtro de A/C')">❄️ Filtro A/C</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de filtro de combustible')">⛽ Filtro combustible</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de aceite, filtro de motor y filtro de aire')">🔄 Aceite + todos los filtros</div>
+        </div>
+      </div>
+
+      <div id="submenu-frenos" class="submenu" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">FRENOS — elegí el trabajo:</div>
+        <div class="chips">
+          <div class="chip sub" onclick="quickFillSub('Revisión de frenos delanteros')">🔵 Frenos delanteros</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión de frenos traseros')">🔴 Frenos traseros</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de pastillas delanteras')">🔵 Pastillas delanteras</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de pastillas traseras')">🔴 Pastillas traseras</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de discos y pastillas delanteros')">⚙️ Discos + pastillas del.</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de discos y pastillas traseros')">⚙️ Discos + pastillas tras.</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión completa del sistema de frenos')">🔍 Revisión completa frenos</div>
+        </div>
+      </div>
+
+      <div id="submenu-suspension" class="submenu" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">SUSPENSIÓN — elegí el trabajo:</div>
+        <div class="chips">
+          <div class="chip sub" onclick="quickFillSub('Revisión de suspensión delantera')">🔵 Suspensión delantera</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión de suspensión trasera')">🔴 Suspensión trasera</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de amortiguadores delanteros')">🔵 Amortiguadores del.</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de amortiguadores traseros')">🔴 Amortiguadores tras.</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión completa de suspensión y dirección')">🔍 Suspensión + dirección</div>
+          <div class="chip sub" onclick="quickFillSub('Alineación y balanceo')">🎯 Alineación y balanceo</div>
+        </div>
+      </div>
+
+      <div id="submenu-otros" class="submenu" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">MÁS SERVICIOS:</div>
+        <div class="chips">
+          <div class="chip sub" onclick="quickFillSub('Revisión general del vehículo')">🔍 Revisión general</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión de sistema eléctrico')">⚡ Sistema eléctrico</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión de luces')">💡 Luces</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión de motor')">🔧 Motor</div>
+          <div class="chip sub" onclick="quickFillSub('Cambio de llantas')">🔘 Llantas</div>
+          <div class="chip sub" onclick="quickFillSub('Revisión pre-ITV – Inspección Técnica Vehicular')">📋 Pre-inspección ITV</div>
+        </div>
       </div>
 
       <div id="edit-banner-wrap"></div>
@@ -814,8 +866,38 @@ function setLoading(on) {
 }
 
 // ── QUICK FILL ──
-function quickFill(el, txt) {
+let activeSubMenu = null;
+
+function toggleSubMenu(name, el) {
+  // Close all submenus
+  document.querySelectorAll('.submenu').forEach(s => s.style.display = 'none');
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+
+  if(activeSubMenu === name) {
+    // Toggle off if clicking the same category
+    activeSubMenu = null;
+    return;
+  }
+  activeSubMenu = name;
+  el.classList.add('sel');
+  const sub = document.getElementById('submenu-' + name);
+  if(sub) sub.style.display = 'block';
+}
+
+function quickFillSub(txt) {
+  document.getElementById('q-tipo').value = txt;
+  // Close all submenus after selection
+  document.querySelectorAll('.submenu').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+  activeSubMenu = null;
+  toast('✅ ' + txt);
+}
+
+function quickFill(el, txt) {
+  // Close any open submenus
+  document.querySelectorAll('.submenu').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+  activeSubMenu = null;
   el.classList.add('sel');
   document.getElementById('q-tipo').value = txt;
 }
@@ -2093,10 +2175,11 @@ function itvDetailPanel(placa) {
     msg = `Placa terminada en <strong>${info.digit}</strong> → revisión en <strong>${info.mesNombre}</strong>.`;
   }
 
-  return `<div style="background:${color};border-radius:10px;padding:11px 13px;margin-bottom:12px;font-size:13px;line-height:1.6">
-    ${icon} <strong>Inspección Técnica Vehicular (ITV)</strong><br>${msg}
+  const textColor = info.esEsteMes ? '#7f1d1d' : info.esMesSiguiente ? '#78350f' : 'var(--text)';
+  return `<div style="background:${color};border-radius:10px;padding:11px 13px;margin-bottom:12px;font-size:13px;line-height:1.6;color:${textColor}">
+    ${icon} <strong style="color:${textColor}">Inspección Técnica Vehicular (ITV)</strong><br><span style="color:${textColor}">${msg}</span>
     <div style="margin-top:6px">
-      <a href="https://www.itv.co.cr" target="_blank" style="color:#1d4ed8;font-size:12px;font-weight:600">Agendar cita en ITV →</a>
+      <a href="https://www.dekra.cr/es/inicio/" target="_blank" style="color:#1d4ed8;font-size:12px;font-weight:600">Agendar cita en DEKRA →</a>
     </div>
   </div>`;
 }

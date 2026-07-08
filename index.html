@@ -1388,7 +1388,7 @@ function openDetail(id) {
     <div class="row2 mb10">
       <div>
         <label>Fecha de entrega</label>
-        <input type="date" id="wd-fecha" value="${c.workFecha||''}">
+        <input type="date" id="wd-fecha" value="${toDateInput(c.workFecha)}">
       </div>
       <div>
         <label>Km al entregar</label>
@@ -1478,6 +1478,8 @@ async function saveWorkLog(id) {
   const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
   c.workFecha = document.getElementById('wd-fecha')?.value || '';
+  // Ensure YYYY-MM-DD format before saving
+  c.workFecha = toDateInput(c.workFecha) || c.workFecha;
   c.workKm = document.getElementById('wd-km')?.value || '';
   c.workObs = document.getElementById('wd-obs')?.value || '';
   c.estado = 'realizado';
@@ -1615,6 +1617,80 @@ function escHtml(s) { s = (s===null||s===undefined) ? '' : String(s); return s.r
 function fmtDate(iso) {
   if(!iso) return '—';
   try { return new Date(iso.includes('T')?iso:iso+'T00:00:00').toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'}); } catch(e){return iso;}
+}
+
+// Normaliza cualquier formato de fecha a YYYY-MM-DD para inputs type="date"
+// Sheets puede devolver fechas como "Thu Jul 03 2026 00:00:00", "2026-07-03T00:00:00.000Z", o "2026-07-03"
+function toDateInput(val) {
+  if(!val) return '';
+  const s = String(val).trim();
+  if(!s || s === 'Invalid Date') return '';
+
+  // Already YYYY-MM-DD — perfect
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // DD/MM/YYYY (common Sheets export format in Costa Rica locale)
+  const dmY = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(dmY) {
+    const [,d,m,y] = dmY;
+    return y + '-' + m.padStart(2,'0') + '-' + d.padStart(2,'0');
+  }
+
+  // MM/DD/YYYY
+  const mdY = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(mdY) {
+    const [,m,d,y] = mdY;
+    return y + '-' + m.padStart(2,'0') + '-' + d.padStart(2,'0');
+  }
+
+  // Sheets Date object serialized: "Fri Jul 04 2026 00:00:00 GMT-0600 ..."
+  // Use UTC parts to avoid timezone shift
+  try {
+    const d = new Date(s);
+    if(isNaN(d.getTime())) return '';
+    // Add local timezone offset to get the correct local date
+    const local = new Date(d.getTime() + d.getTimezoneOffset() * -60000);
+    const y = local.getFullYear();
+    const m = String(local.getMonth()+1).padStart(2,'0');
+    const day = String(local.getDate()).padStart(2,'0');
+    return y + '-' + m + '-' + day;
+  } catch(e) { return ''; }
+}
+
+// Normaliza hora a HH:MM para inputs type="time" / select
+// Sheets puede devolver "15:00:00", "15:00", Date objects, etc.
+function toTimeInput(val) {
+  if(!val) return '';
+  const s = String(val).trim();
+  if(!s) return '';
+
+  // HH:MM already
+  if(/^\d{2}:\d{2}$/.test(s)) return s;
+
+  // HH:MM:SS (Sheets stores times with seconds)
+  if(/^\d{1,2}:\d{2}:\d{2}/.test(s)) {
+    const parts = s.split(':');
+    return parts[0].padStart(2,'0') + ':' + parts[1];
+  }
+
+  // H:MM (single digit hour)
+  if(/^\d{1}:\d{2}$/.test(s)) return '0' + s;
+
+  // Fraction of day (Sheets sometimes stores time as decimal 0.625 = 15:00)
+  const num = parseFloat(s);
+  if(!isNaN(num) && num >= 0 && num < 1) {
+    const totalMins = Math.round(num * 24 * 60);
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+  }
+
+  // Try as full date string
+  try {
+    const d = new Date(s);
+    if(isNaN(d.getTime())) return '';
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  } catch(e) { return ''; }
 }
 function badgeClass(estado) {
   return {pendiente:'b-pend',aprobada:'b-apro',realizado:'b-real',rechazada:'b-rech'}[estado]||'b-pend';
@@ -1949,7 +2025,9 @@ function fmtHora12(hora24) {
 }
 
 function buildCitaPanel(c) {
-  const fecha = c.citaFecha || '';
+  const fecha = toDateInput(c.citaFecha);
+  c.citaFecha = fecha; // normalize in-place so display also works
+  c.citaHora = toTimeInput(c.citaHora);
   const horarios = getHorariosDisponibles(fecha);
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -2038,8 +2116,8 @@ function guardarCita(id, silent) {
     return false;
   }
 
-  c.citaFecha = fecha;
-  c.citaHora = hora;
+  c.citaFecha = toDateInput(fecha) || fecha;
+  c.citaHora = toTimeInput(hora) || hora;
   c.citaDireccion = dir;
   c.citaDuracion = dur;
   saveLocal();

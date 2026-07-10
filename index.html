@@ -466,6 +466,7 @@ if ('serviceWorker' in navigator) {
       <div class="add-item-row">
         <button class="btn btn-sm" onclick="addItem('labor')" style="flex:1;justify-content:center">➕ Mano de obra</button>
         <button class="btn btn-sm" onclick="addItem('part')" style="flex:1;justify-content:center">➕ Repuesto</button>
+        <button class="btn btn-sm" onclick="openCatalogPicker()" style="flex:1;justify-content:center;background:#1a1a2e;color:#fff;border-color:#1a1a2e">📋 Del catálogo</button>
       </div>
 
       <div class="total-pill mb14">
@@ -564,6 +565,29 @@ if ('serviceWorker' in navigator) {
 
     </div>
 
+    <!-- TAB: CATÁLOGO DE PRECIOS -->
+    <div class="content tab" id="tab-catalog">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="section-label" style="margin:0">catálogo de precios</div>
+        <button class="btn btn-primary btn-sm" onclick="openCatalogForm()">➕ Nuevo</button>
+      </div>
+
+      <!-- Filter tabs -->
+      <div class="chips" style="margin-bottom:14px" id="catalog-filter-chips">
+        <div class="chip sel" onclick="setCatalogFilter('todos',this)">Todos</div>
+        <div class="chip" onclick="setCatalogFilter('labor',this)">🔧 Mano de obra</div>
+        <div class="chip" onclick="setCatalogFilter('part',this)">📦 Repuestos</div>
+      </div>
+
+      <div class="search-wrap" style="margin-bottom:12px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-catalog" placeholder="Buscar en catálogo..." oninput="renderCatalog()">
+      </div>
+
+      <div id="catalog-list"></div>
+    </div>
+
   </div>
 
   <div class="nav">
@@ -578,6 +602,9 @@ if ('serviceWorker' in navigator) {
     </button>
     <button class="nav-btn" onclick="showTab('metrics',this)">
       <span class="icon">📊</span><span>Métricas</span><span class="nav-dot"></span>
+    </button>
+    <button class="nav-btn" onclick="showTab('catalog',this)">
+      <span class="icon">📋</span><span>Catálogo</span><span class="nav-dot"></span>
     </button>
   </div>
 </div>
@@ -635,6 +662,7 @@ function init() {
   document.getElementById('main-app').style.display = 'flex';
   updateSyncUI();
   renderItems();
+  if(!db.catalog) db.catalog = [];
   // Auto-sync on load
   setTimeout(syncNow, 800);
   // Reintenta cambios pendientes de sesiones anteriores (ej: se cerró la app sin internet)
@@ -674,6 +702,7 @@ function showTab(name, btn) {
   if(name === 'cots') { updateStats(); renderCots(); }
   if(name === 'clients') renderClients();
   if(name === 'metrics') setTimeout(renderMetrics, 30);
+  if(name === 'catalog') renderCatalog();
   if(name === 'nueva' && editingId === null) {
     document.getElementById('save-btn') && (document.getElementById('save-btn').textContent = '💾 Guardar cotización');
     document.getElementById('edit-banner-wrap') && (document.getElementById('edit-banner-wrap').innerHTML = '');
@@ -2262,6 +2291,258 @@ function itvDetailPanel(placa) {
   </div>`;
 }
 
+
+// ══════════════════════════════════════
+// CATÁLOGO DE PRECIOS
+// ══════════════════════════════════════
+// db.catalog = [{id, type, name, price, cost, brand, category, notes}]
+
+function initCatalog() {
+  if(!db.catalog) db.catalog = [];
+}
+
+// ── Render catalog list ──
+let catalogFilter = 'todos';
+
+function setCatalogFilter(f, el) {
+  catalogFilter = f;
+  document.querySelectorAll('#catalog-filter-chips .chip').forEach(c => c.classList.remove('sel'));
+  if(el) el.classList.add('sel');
+  renderCatalog();
+}
+
+function renderCatalog() {
+  initCatalog();
+  const q = (document.getElementById('search-catalog')?.value || '').toLowerCase();
+  const list = db.catalog.filter(item =>
+    (catalogFilter === 'todos' || item.type === catalogFilter || item.category === catalogFilter) &&
+    (!q || item.name.toLowerCase().includes(q) || (item.brand||'').toLowerCase().includes(q) || (item.category||'').toLowerCase().includes(q))
+  );
+
+  const el = document.getElementById('catalog-list');
+  if(!el) return;
+
+  if(!list.length) {
+    el.innerHTML = '<div class="empty"><div class="e-icon">📋</div><p>' +
+      (db.catalog.length === 0
+        ? 'Tu catálogo está vacío.<br>Tocá <strong>➕ Nuevo</strong> para agregar tus servicios y precios.'
+        : 'Sin resultados para ese filtro.') +
+      '</p></div>';
+    return;
+  }
+
+  // Group by category
+  const cats = {};
+  list.forEach(item => {
+    const c = item.category || 'general';
+    if(!cats[c]) cats[c] = [];
+    cats[c].push(item);
+  });
+
+  const catNames = {aceite:'🛢 Aceite y filtros', frenos:'⭕ Frenos', suspension:'🚗 Suspensión',
+    electrico:'⚡ Eléctrico', motor:'🔧 Motor', transmision:'⚙️ Transmisión', general:'📋 General'};
+
+  el.innerHTML = Object.entries(cats).map(([cat, items]) => `
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px">${catNames[cat]||cat}</div>
+    ${items.map(item => {
+      const margin = item.cost > 0 ? Math.round((item.price - item.cost) / item.price * 100) : null;
+      return `
+      <div class="card" style="margin-bottom:8px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600">${escHtml(item.name)}</div>
+            <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
+              <span class="item-label ${item.type==='labor'?'lbl-labor':'lbl-part'}" style="font-size:10px">${item.type==='labor'?'Mano de obra':'Repuesto'}</span>
+              ${item.brand ? `<span style="font-size:12px;color:var(--text2)">${escHtml(item.brand)}</span>` : ''}
+              ${margin !== null ? `<span style="font-size:11px;color:#059669;font-weight:600">Margen: ${margin}%</span>` : ''}
+            </div>
+            ${item.notes ? `<div style="font-size:12px;color:var(--text3);margin-top:3px">${escHtml(item.notes)}</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:16px;font-weight:700;color:var(--text)">₡${(item.price||0).toLocaleString('es-CR')}</div>
+            ${item.cost > 0 ? `<div style="font-size:11px;color:var(--text3)">Costo: ₡${item.cost.toLocaleString('es-CR')}</div>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn btn-sm" style="flex:1;justify-content:center" onclick="editCatalogItem('${item.id}')">✏️ Editar</button>
+          <button class="btn btn-sm" style="flex:1;justify-content:center;color:#e53e3e;border-color:#e53e3e" onclick="deleteCatalogItem('${item.id}')">🗑 Eliminar</button>
+        </div>
+      </div>`;
+    }).join('')}
+  `).join('');
+}
+
+// ── Catalog form ──
+let catEditId = null;
+
+function openCatalogForm(id) {
+  initCatalog();
+  catEditId = id || null;
+  const modal = document.getElementById('catalog-modal');
+  const item = id ? db.catalog.find(x => x.id === id) : null;
+
+  document.getElementById('catalog-modal-title').textContent = item ? 'Editar ítem' : 'Nuevo ítem';
+  document.getElementById('cat-edit-id').value = id || '';
+  document.getElementById('cat-name').value = item?.name || '';
+  document.getElementById('cat-price').value = item?.price || '';
+  document.getElementById('cat-cost').value = item?.cost || '';
+  document.getElementById('cat-brand').value = item?.brand || '';
+  document.getElementById('cat-notes').value = item?.notes || '';
+  document.getElementById('cat-category').value = item?.category || 'general';
+  setCatType(item?.type || 'labor');
+
+  modal.style.display = 'flex';
+}
+
+function closeCatalogForm() {
+  document.getElementById('catalog-modal').style.display = 'none';
+}
+
+function setCatType(type) {
+  document.getElementById('cat-type').value = type;
+  const btnL = document.getElementById('cat-type-labor');
+  const btnP = document.getElementById('cat-type-part');
+  if(type === 'labor') {
+    btnL.style.background = 'var(--red)'; btnL.style.color = '#fff'; btnL.style.borderColor = 'var(--red)';
+    btnP.style.background = 'var(--surface)'; btnP.style.color = 'var(--text)'; btnP.style.borderColor = 'var(--border2)';
+  } else {
+    btnP.style.background = '#2563eb'; btnP.style.color = '#fff'; btnP.style.borderColor = '#2563eb';
+    btnL.style.background = 'var(--surface)'; btnL.style.color = 'var(--text)'; btnL.style.borderColor = 'var(--border2)';
+  }
+}
+
+function saveCatalogItem() {
+  const name = document.getElementById('cat-name').value.trim();
+  const price = parseFloat(document.getElementById('cat-price').value) || 0;
+  if(!name) { toast('⚠️ Escribí el nombre del servicio'); return; }
+  if(!price) { toast('⚠️ Agregá el precio de venta'); return; }
+
+  initCatalog();
+  const item = {
+    id: catEditId || 'cat_' + Date.now(),
+    type: document.getElementById('cat-type').value,
+    name,
+    price,
+    cost: parseFloat(document.getElementById('cat-cost').value) || 0,
+    brand: document.getElementById('cat-brand').value.trim(),
+    category: document.getElementById('cat-category').value,
+    notes: document.getElementById('cat-notes').value.trim(),
+  };
+
+  if(catEditId) {
+    const idx = db.catalog.findIndex(x => x.id === catEditId);
+    if(idx >= 0) db.catalog[idx] = item;
+  } else {
+    db.catalog.push(item);
+  }
+
+  saveLocal();
+  saveCatalogToCloud();
+  closeCatalogForm();
+  renderCatalog();
+  toast('✅ ' + (catEditId ? 'Ítem actualizado' : 'Ítem guardado en catálogo'));
+  catEditId = null;
+}
+
+function editCatalogItem(id) { openCatalogForm(id); }
+
+function deleteCatalogItem(id) {
+  if(!confirm('¿Eliminar este ítem del catálogo?')) return;
+  db.catalog = db.catalog.filter(x => x.id !== id);
+  saveLocal();
+  saveCatalogToCloud();
+  renderCatalog();
+  toast('🗑 Ítem eliminado');
+}
+
+// ── Save catalog to cloud ──
+function saveCatalogToCloud() {
+  if(!cloudMode) return;
+  const payload = JSON.stringify({action:'saveCatalog', data: db.catalog});
+  const url = scriptUrl + '?method=POST&payload=' + encodeURIComponent(payload);
+  return new Promise((resolve) => {
+    const name = 'cat_' + Date.now();
+    window[name] = () => { delete window[name]; if(document.head.contains(s)) document.head.removeChild(s); resolve(); };
+    const s = document.createElement('script');
+    s.src = url + '&callback=' + name;
+    s.onerror = () => { delete window[name]; if(document.head.contains(s)) document.head.removeChild(s); resolve(); };
+    document.head.appendChild(s);
+  });
+}
+
+// ── Catalog Picker (used from Nueva Cotización) ──
+let pickerFilter = 'todos';
+
+function openCatalogPicker() {
+  initCatalog();
+  if(!db.catalog.length) {
+    toast('⚠️ Tu catálogo está vacío. Agregá ítems primero en la pestaña Catálogo.');
+    return;
+  }
+  pickerFilter = 'todos';
+  document.querySelectorAll('#picker-filter-chips .chip').forEach(c => c.classList.remove('sel'));
+  document.querySelector('#picker-filter-chips .chip')?.classList.add('sel');
+  document.getElementById('picker-search').value = '';
+  renderPickerList();
+  document.getElementById('catalog-picker').style.display = 'flex';
+}
+
+function closeCatalogPicker() {
+  document.getElementById('catalog-picker').style.display = 'none';
+}
+
+function setPickerFilter(f, el) {
+  pickerFilter = f;
+  document.querySelectorAll('#picker-filter-chips .chip').forEach(c => c.classList.remove('sel'));
+  if(el) el.classList.add('sel');
+  renderPickerList();
+}
+
+function renderPickerList() {
+  const q = (document.getElementById('picker-search')?.value || '').toLowerCase();
+  const list = db.catalog.filter(item =>
+    (pickerFilter === 'todos' || item.type === pickerFilter || item.category === pickerFilter) &&
+    (!q || item.name.toLowerCase().includes(q) || (item.brand||'').toLowerCase().includes(q))
+  );
+
+  const el = document.getElementById('picker-list');
+  if(!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">Sin resultados</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(item => `
+    <div onclick="addItemFromCatalog('${item.id}')"
+      style="display:flex;justify-content:space-between;align-items:center;padding:12px 10px;border-bottom:1px solid var(--border);cursor:pointer;active:background:var(--surface2)">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">${escHtml(item.name)}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">
+          <span class="item-label ${item.type==='labor'?'lbl-labor':'lbl-part'}" style="font-size:10px">${item.type==='labor'?'MO':'Rep'}</span>
+          ${item.brand ? ' · ' + escHtml(item.brand) : ''}
+        </div>
+      </div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);flex-shrink:0;margin-left:10px">₡${(item.price||0).toLocaleString('es-CR')}</div>
+    </div>
+  `).join('');
+}
+
+function addItemFromCatalog(catId) {
+  const catItem = db.catalog.find(x => x.id === catId);
+  if(!catItem) return;
+  items.push({
+    id: iCount++,
+    type: catItem.type,
+    desc: catItem.name,
+    qty: 1,
+    price: catItem.price,
+    fromCatalog: catId
+  });
+  renderItems();
+  closeCatalogPicker();
+  toast('✅ ' + catItem.name.substring(0,30) + ' agregado');
+}
+
+
 // ── DARK MODE ──
 function toggleDark() {
   const isDark = document.body.classList.toggle('dark');
@@ -2293,6 +2574,96 @@ init();
   <div style="display:flex;gap:8px;flex-shrink:0">
     <button onclick="document.getElementById('install-banner').style.display='none'" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer">Ahora no</button>
     <button id="install-btn" style="background:#e53e3e;border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer">Instalar</button>
+  </div>
+</div>
+
+<!-- CATALOG FORM MODAL -->
+<div id="catalog-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:700;align-items:flex-end;justify-content:center">
+  <div style="background:var(--surface);border-radius:18px 18px 0 0;padding:20px 16px 32px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto">
+    <div style="width:36px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 16px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700" id="catalog-modal-title">Nuevo ítem</div>
+      <button onclick="closeCatalogForm()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2)">×</button>
+    </div>
+
+    <input type="hidden" id="cat-edit-id">
+
+    <div class="mb10">
+      <label>Tipo</label>
+      <div style="display:flex;gap:8px">
+        <button id="cat-type-labor" onclick="setCatType('labor')" class="btn" style="flex:1;justify-content:center;background:var(--red);color:#fff;border-color:var(--red)">🔧 Mano de obra</button>
+        <button id="cat-type-part" onclick="setCatType('part')" class="btn" style="flex:1;justify-content:center">📦 Repuesto</button>
+      </div>
+    </div>
+    <input type="hidden" id="cat-type" value="labor">
+
+    <div class="mb10">
+      <label>Nombre del servicio / repuesto *</label>
+      <input type="text" id="cat-name" placeholder="Ej: Cambio de aceite y filtro de motor">
+    </div>
+
+    <div class="row2 mb10">
+      <div>
+        <label>Precio de venta (₡) *</label>
+        <input type="number" id="cat-price" placeholder="0">
+      </div>
+      <div id="cat-cost-wrap">
+        <label>Costo / proveedor (₡)</label>
+        <input type="number" id="cat-cost" placeholder="0">
+      </div>
+    </div>
+
+    <div class="mb10" id="cat-brand-wrap">
+      <label>Marca / proveedor</label>
+      <input type="text" id="cat-brand" placeholder="Ej: Castrol, Bosch, NAPA...">
+    </div>
+
+    <div class="mb10">
+      <label>Categoría</label>
+      <select id="cat-category">
+        <option value="aceite">Aceite y filtros</option>
+        <option value="frenos">Frenos</option>
+        <option value="suspension">Suspensión</option>
+        <option value="electrico">Eléctrico</option>
+        <option value="motor">Motor</option>
+        <option value="transmision">Transmisión</option>
+        <option value="general">General / Otro</option>
+      </select>
+    </div>
+
+    <div class="mb10">
+      <label>Notas internas</label>
+      <input type="text" id="cat-notes" placeholder="Aplicación, observaciones, etc.">
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn btn-full" onclick="closeCatalogForm()">Cancelar</button>
+      <button class="btn btn-primary btn-full" onclick="saveCatalogItem()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATALOG PICKER MODAL (used from Nueva Cotización) -->
+<div id="catalog-picker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:700;align-items:flex-end;justify-content:center">
+  <div style="background:var(--surface);border-radius:18px 18px 0 0;padding:20px 16px 32px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto">
+    <div style="width:36px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 16px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:16px;font-weight:700">Elegir del catálogo</div>
+      <button onclick="closeCatalogPicker()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2)">×</button>
+    </div>
+    <div class="chips" style="margin-bottom:10px" id="picker-filter-chips">
+      <div class="chip sel" onclick="setPickerFilter('todos',this)">Todos</div>
+      <div class="chip" onclick="setPickerFilter('labor',this)">🔧 MO</div>
+      <div class="chip" onclick="setPickerFilter('part',this)">📦 Repuesto</div>
+      <div class="chip" onclick="setPickerFilter('aceite',this)">🛢 Aceite</div>
+      <div class="chip" onclick="setPickerFilter('frenos',this)">⭕ Frenos</div>
+      <div class="chip" onclick="setPickerFilter('suspension',this)">🚗 Suspensión</div>
+    </div>
+    <div class="search-wrap" style="margin-bottom:10px">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="picker-search" placeholder="Buscar..." oninput="renderPickerList()">
+    </div>
+    <div id="picker-list"></div>
   </div>
 </div>
 

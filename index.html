@@ -274,22 +274,7 @@ link.rel = 'manifest';
 link.href = manifestUrl;
 document.head.appendChild(link);
 
-// Register a minimal Service Worker (required by Chrome/Android to allow
-// "Add to Home screen" install prompts — without this, beforeinstallprompt
-// never fires on Android even with a valid manifest).
-if ('serviceWorker' in navigator) {
-  const swCode = `
-    self.addEventListener('install', e => self.skipWaiting());
-    self.addEventListener('activate', e => self.clients.claim());
-    self.addEventListener('fetch', e => {
-      // Pass-through network fetch (no offline caching, just satisfies PWA installability)
-      e.respondWith(fetch(e.request).catch(() => new Response('', {status: 200})));
-    });
-  `;
-  const swBlob = new Blob([swCode], {type: 'application/javascript'});
-  const swUrl = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration skipped:', err));
-}
+// Service Worker handled by GitHub Pages (sw.js)
 </script>
 </head>
 <body>
@@ -463,10 +448,10 @@ if ('serviceWorker' in navigator) {
 
       <div id="items-list"></div>
 
-      <div class="add-item-row">
-        <button class="btn btn-sm" onclick="addItem('labor')" style="flex:1;justify-content:center">➕ Mano de obra</button>
-        <button class="btn btn-sm" onclick="addItem('part')" style="flex:1;justify-content:center">➕ Repuesto</button>
-        <button class="btn btn-sm" onclick="openCatalogPicker()" style="flex:1;justify-content:center;background:#1a1a2e;color:#fff;border-color:#1a1a2e">📋 Del catálogo</button>
+      <div class="add-item-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <button class="btn btn-sm" onclick="addItem('labor')" style="justify-content:center;text-align:center;white-space:nowrap">➕ Mano de obra</button>
+        <button class="btn btn-sm" onclick="addItem('part')" style="justify-content:center;text-align:center">➕ Repuesto</button>
+        <button class="btn btn-sm" onclick="openCatalogPicker()" style="justify-content:center;text-align:center;background:#1a1a2e;color:#fff;border-color:#1a1a2e">📋 Del catálogo</button>
       </div>
 
       <div class="total-pill mb14">

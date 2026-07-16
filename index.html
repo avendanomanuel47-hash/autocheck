@@ -1530,9 +1530,27 @@ function openClientDetail(nombre) {
     </div>
 
     ${itvDetailPanel(cots[0]?.placa||'')}
-    <button class="btn btn-primary btn-full mb14" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(ultimoVehiculo)}','${escHtml(ultimaPlaca)}')">
-      ➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])}
-    </button>
+    ${vehiculos.length <= 1 ?
+      `<button class="btn btn-primary btn-full mb14" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(ultimoVehiculo)}','${escHtml(ultimaPlaca)}')">
+        ➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])}
+      </button>` :
+      `<div class="card mb14" style="border:1.5px solid var(--red)">
+        <div class="section-label" style="color:var(--red);margin-bottom:10px">➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])} — elegí el vehículo:</div>
+        ${vehiculos.map((v, i) => `
+          <div onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(v)}','${escHtml(placas[i]||'')}')"
+            style="display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-radius:10px;border:1.5px solid var(--border2);margin-bottom:8px;cursor:pointer;background:var(--surface2)">
+            <div>
+              <div style="font-size:14px;font-weight:600">🚗 ${escHtml(v)}</div>
+              ${placas[i] ? `<div style="font-size:12px;color:var(--text2);margin-top:2px">Placa: ${escHtml(placas[i])}</div>` : ''}
+            </div>
+            <span style="font-size:18px;color:var(--text3)">→</span>
+          </div>
+        `).join('')}
+        <button class="btn btn-sm btn-full" style="margin-top:4px" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','','')">
+          + Vehículo nuevo
+        </button>
+      </div>`
+    }
 
     <div class="row2 mb14" style="gap:10px">
       <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editClient('${escHtml(nombre)}','${escHtml(tel)}')">✏️ Editar cliente</button>

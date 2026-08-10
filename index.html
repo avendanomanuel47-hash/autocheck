@@ -1485,6 +1485,173 @@ function openDetail(id) {
   document.getElementById('detail-overlay').scrollTop = 0;
 }
 
+
+// ── PDF GENERATION ──
+function pdfStyles() {
+  return `<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { padding: 28px; font-size: 13px; color: #111; }
+    .brand { font-size: 20px; font-weight: 800; color: #1d4ed8; }
+    .subbrand { font-size: 12px; color: #555; margin-bottom: 2px; }
+    h2 { font-size: 14px; font-weight: 700; margin: 16px 0 8px; border-bottom: 2px solid #1d4ed8; padding-bottom: 4px; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; margin-bottom: 12px; }
+    .kv { display: flex; gap: 6px; font-size: 12px; padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
+    .kv .k { color: #666; min-width: 110px; }
+    .kv .v { font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    th { background: #1d4ed8; color: #fff; padding: 6px 8px; font-size: 11px; text-align: left; }
+    td { padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #eee; }
+    .total-row td { font-weight: 700; font-size: 13px; background: #f0f4ff; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+    .b-pend { background:#fef3c7; color:#92400e; }
+    .b-apro { background:#d1fae5; color:#065f46; }
+    .b-real { background:#dbeafe; color:#1e40af; }
+    .b-rech { background:#fee2e2; color:#991b1b; }
+    .section-sep { margin: 18px 0 10px; border-top: 2px solid #e5e7eb; padding-top: 12px; }
+    .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
+    @media print { body { padding: 14px; } }
+  </style>`;
+}
+
+function pdfHeader() {
+  return `<div style="margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #1d4ed8">
+    <div class="brand">Avendaño AutoCheck</div>
+    <div class="subbrand">Inspección y mantenimiento vehicular a domicilio</div>
+    <div class="subbrand">Costa Rica &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'})}</div>
+  </div>`;
+}
+
+function pdfBadge(estado) {
+  const cls = { pendiente:'b-pend', aprobada:'b-apro', realizado:'b-real', rechazada:'b-rech' };
+  const lbl = { pendiente:'Pendiente', aprobada:'Aprobada', realizado:'Realizado', rechazada:'Rechazada' };
+  return `<span class="badge ${cls[estado]||'b-pend'}">${lbl[estado]||estado}</span>`;
+}
+
+function pdfCotizacion(id) {
+  const c = db.cotizaciones.find(x => x.id === id);
+  if(!c) return;
+
+  const rows = c.items.map(i => `<tr>
+    <td>${i.type==='labor'?'Mano de obra':'Repuesto'}</td>
+    <td>${escHtml(i.desc||'—')}</td>
+    <td style="text-align:center">${i.qty}</td>
+    <td style="text-align:right">&#8353;${(i.price||0).toLocaleString()}</td>
+    <td style="text-align:right;font-weight:600">&#8353;${((i.qty||1)*(i.price||0)).toLocaleString()}</td>
+  </tr>`).join('');
+
+  const workHtml = (c.workFecha || c.workObs) ? `
+    <h2>Registro de Trabajo</h2>
+    <div class="grid2">
+      ${c.workFecha ? `<div class="kv"><span class="k">Fecha entrega:</span><span class="v">${fmtDate(c.workFecha)}</span></div>` : ''}
+      ${c.workKm ? `<div class="kv"><span class="k">Km al entregar:</span><span class="v">${c.workKm} km</span></div>` : ''}
+    </div>
+    ${c.workObs ? `<p style="font-size:12px;color:#333;margin-bottom:12px;line-height:1.5">${escHtml(c.workObs)}</p>` : ''}
+  ` : '';
+
+  const citaHtml = c.citaFecha ? `
+    <h2>Cita Agendada</h2>
+    <div class="grid2">
+      <div class="kv"><span class="k">Fecha:</span><span class="v">${fmtDate(c.citaFecha)}</span></div>
+      <div class="kv"><span class="k">Hora:</span><span class="v">${c.citaHora||'—'}</span></div>
+      ${c.citaDireccion ? `<div class="kv" style="grid-column:1/-1"><span class="k">Direccion:</span><span class="v">${escHtml(c.citaDireccion)}</span></div>` : ''}
+    </div>
+  ` : '';
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+    <title>Cotizacion - ${escHtml(c.cliente)}</title>${pdfStyles()}</head><body>
+    ${pdfHeader()}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;border:none">Cotizacion</h2>
+      ${pdfBadge(c.estado)}
+    </div>
+    <div class="grid2">
+      <div class="kv"><span class="k">Cliente:</span><span class="v">${escHtml(c.cliente)}</span></div>
+      <div class="kv"><span class="k">Telefono:</span><span class="v">${c.tel||'—'}</span></div>
+      ${c.cedula ? `<div class="kv"><span class="k">Cedula:</span><span class="v">${escHtml(c.cedula)}</span></div>` : ''}
+      <div class="kv"><span class="k">Fecha:</span><span class="v">${fmtDate(c.fecha)}</span></div>
+      <div class="kv"><span class="k">Vehiculo:</span><span class="v">${escHtml(c.vehiculo||'—')}</span></div>
+      <div class="kv"><span class="k">Placa:</span><span class="v">${c.placa||'—'}</span></div>
+      ${c.km ? `<div class="kv"><span class="k">Km entrada:</span><span class="v">${c.km} km</span></div>` : ''}
+      ${c.tipo ? `<div class="kv"><span class="k">Tipo:</span><span class="v">${escHtml(c.tipo)}</span></div>` : ''}
+    </div>
+    <h2>Detalle de Servicios</h2>
+    <table>
+      <thead><tr><th>Tipo</th><th>Descripcion</th><th style="text-align:center">Cant.</th><th style="text-align:right">P.U.</th><th style="text-align:right">Total</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tr class="total-row"><td colspan="4" style="text-align:right;padding-right:12px">TOTAL</td><td style="text-align:right">&#8353;${c.total.toLocaleString()}</td></tr>
+    </table>
+    ${c.obs ? `<p style="font-size:12px;color:#555;margin-bottom:14px;line-height:1.5"><strong>Observaciones:</strong> ${escHtml(c.obs)}</p>` : ''}
+    ${citaHtml}${workHtml}
+    <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
+    </body></html>`;
+
+  const w = window.open('', '_blank');
+  if(!w) { toast('Permitir popups para generar PDF'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+}
+
+function pdfHistorialVehiculo(cliente, placa) {
+  const cots = db.cotizaciones
+    .filter(c => c.cliente === cliente && (c.placa||'sin-placa') === placa)
+    .sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+
+  if(!cots.length) { toast('Sin historial para esta placa'); return; }
+
+  const first = cots[0];
+  const totalGastado = cots.filter(c=>c.estado==='realizado').reduce((s,c)=>s+Number(c.total||0),0);
+  const realizadas = cots.filter(c=>c.estado==='realizado').length;
+
+  const cotBlocks = cots.map(c => {
+    const rows = c.items.map(i => `<tr>
+      <td>${i.type==='labor'?'MO':'Rep'}</td>
+      <td>${escHtml(i.desc||'—')}</td>
+      <td style="text-align:center">${i.qty}</td>
+      <td style="text-align:right">&#8353;${((i.qty||1)*(i.price||0)).toLocaleString()}</td>
+    </tr>`).join('');
+
+    return `<div class="section-sep">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="font-size:14px">${fmtDate(c.fecha)}</strong>
+        ${pdfBadge(c.estado)}
+      </div>
+      ${c.km ? `<div class="kv" style="margin-bottom:6px"><span class="k">Km entrada:</span><span class="v">${c.km} km</span></div>` : ''}
+      ${c.tipo ? `<div class="kv" style="margin-bottom:6px"><span class="k">Tipo:</span><span class="v">${escHtml(c.tipo)}</span></div>` : ''}
+      <table>
+        <thead><tr><th>Tipo</th><th>Descripcion</th><th style="text-align:center">Cant.</th><th style="text-align:right">Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tr class="total-row"><td colspan="3" style="text-align:right;padding-right:12px">Total visita</td><td style="text-align:right">&#8353;${c.total.toLocaleString()}</td></tr>
+      </table>
+      ${c.workObs ? `<p style="font-size:11px;color:#444;margin-top:6px;line-height:1.5"><strong>Trabajo realizado:</strong> ${escHtml(c.workObs)}</p>` : ''}
+      ${c.obs ? `<p style="font-size:11px;color:#666;margin-top:4px;line-height:1.5"><strong>Obs:</strong> ${escHtml(c.obs)}</p>` : ''}
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+    <title>Historial - ${escHtml(placa)}</title>${pdfStyles()}</head><body>
+    ${pdfHeader()}
+    <h2>Historial de Vehiculo</h2>
+    <div class="grid2">
+      <div class="kv"><span class="k">Cliente:</span><span class="v">${escHtml(cliente)}</span></div>
+      <div class="kv"><span class="k">Telefono:</span><span class="v">${first.tel||'—'}</span></div>
+      ${first.cedula ? `<div class="kv"><span class="k">Cedula:</span><span class="v">${escHtml(first.cedula)}</span></div>` : ''}
+      <div class="kv"><span class="k">Vehiculo:</span><span class="v">${escHtml(first.vehiculo||'—')}</span></div>
+      <div class="kv"><span class="k">Placa:</span><span class="v">${escHtml(placa)}</span></div>
+      <div class="kv"><span class="k">Total visitas:</span><span class="v">${cots.length} (${realizadas} realizadas)</span></div>
+      <div class="kv" style="grid-column:1/-1"><span class="k">Total invertido:</span><span class="v" style="color:#1d4ed8;font-size:14px">&#8353;${totalGastado.toLocaleString()}</span></div>
+    </div>
+    ${cotBlocks}
+    <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
+    </body></html>`;
+
+  const w = window.open('', '_blank');
+  if(!w) { toast('Permitir popups para generar PDF'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+}
+
 function closeDetail() {
   document.getElementById('detail-overlay').classList.remove('open');
   renderCots();
@@ -1561,6 +1728,13 @@ function openClientDetail(nombre) {
         </button>
       </div>`
     }
+
+    <div style="margin-bottom:12px">
+      ${[...new Set(cots.map(c => (c.placa||'sin-placa') + '|||' + (c.vehiculo||'Vehículo')))].map(v => {
+        const [pl, vh] = v.split('|||');
+        return `<button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:8px" onclick="pdfHistorialVehiculo('${escHtml(nombre)}','${escHtml(pl)}')">📄 Historial PDF — ${escHtml(pl)} ${escHtml(vh)}</button>`;
+      }).join('')}
+    </div>
 
     <div class="row2 mb14" style="gap:10px">
       <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editClient('${escHtml(nombre)}','${escHtml(tel)}')">✏️ Editar cliente</button>

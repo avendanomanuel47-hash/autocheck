@@ -1472,6 +1472,7 @@ function openDetail(id) {
     ${workSection}
 
     <div class="card mb14">
+      <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion(${id})">📄 Descargar cotización PDF</button>
       <div class="row2" style="gap:10px">
         <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion(${id})">✏️ Editar cotización</button>
         <button class="btn btn-full btn-danger" onclick="deleteCotizacion(${id})">🗑️ Borrar</button>

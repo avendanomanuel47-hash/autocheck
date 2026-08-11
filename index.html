@@ -555,6 +555,11 @@ document.head.appendChild(link);
         <div id="leg-clientes" style="display:flex;gap:14px;justify-content:center;margin-top:10px"></div>
       </div>
 
+      <div class="card mb14">
+        <div class="section-label" style="margin-bottom:12px">🏆 servicios más vendidos</div>
+        <div id="top-servicios"></div>
+      </div>
+
     </div>
 
     <!-- TAB: CATÁLOGO DE PRECIOS -->
@@ -2039,6 +2044,42 @@ function renderMetrics() {
     { label:'Nuevos',      value:nuevos,      color:'#e53e3e' },
     { label:'Recurrentes', value:recurrentes, color:'#2563eb' },
   ]);
+
+  // ── Top servicios ──
+  const svcMap = {};
+  all.forEach(c => {
+    (c.items||[]).forEach(i => {
+      const key = (i.desc||'Sin nombre').trim();
+      if(!svcMap[key]) svcMap[key] = { desc: key, type: i.type, qty: 0, total: 0, count: 0 };
+      svcMap[key].qty   += (i.qty||1);
+      svcMap[key].total += (i.qty||1)*(i.price||0);
+      svcMap[key].count += 1;
+    });
+  });
+  const topSvcs = Object.values(svcMap).sort((a,b) => b.qty - a.qty).slice(0, 10);
+  const maxQty = topSvcs[0]?.qty || 1;
+  const topEl = document.getElementById('top-servicios');
+  if(topEl) {
+    if(!topSvcs.length) {
+      topEl.innerHTML = '<div style="color:var(--text2);font-size:13px;text-align:center;padding:12px">Sin datos aún</div>';
+    } else {
+      topEl.innerHTML = topSvcs.map((s, i) => {
+        const pct = Math.round(s.qty / maxQty * 100);
+        const color = s.type === 'labor' ? '#e53e3e' : '#2563eb';
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <span style="font-size:13px;font-weight:600">${medal} ${escHtml(s.desc)}</span>
+            <span style="font-size:12px;color:var(--text2)">${s.qty}x &nbsp;·&nbsp; ₡${s.total.toLocaleString()}</span>
+          </div>
+          <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width 0.4s"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${s.type==='labor'?'Mano de obra':'Repuesto'} · en ${s.count} cotización${s.count!==1?'es':''}</div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 function drawDona(canvasId, legendId, data, prefix) {

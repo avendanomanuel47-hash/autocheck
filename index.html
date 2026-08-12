@@ -462,6 +462,7 @@ document.head.appendChild(link);
         <button class="btn btn-sm" onclick="openCatalogPicker()" style="justify-content:center;text-align:center">📋 Catálogo</button>
       </div>
 
+      <div id="utilidad-box" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px;margin-bottom:10px"></div>
       <div class="total-pill mb14">
         <span class="lbl">Total cotización</span>
         <span class="amt" id="total-show">₡0</span>
@@ -1007,32 +1008,90 @@ function updateF(id, field, val) {
   calcTotal();
 }
 
+function applyMargin(id, pct) {
+  const it = items.find(x => x.id === id);
+  if(!it || !it.cost) { toast('Ingresá el costo primero'); return; }
+  updateF(id, 'price', Math.round(it.cost * (1 + pct/100)));
+  renderItems();
+}
+
 function renderItems() {
   const el = document.getElementById('items-list');
   if(!items.length) {
     el.innerHTML = '<p style="font-size:13px;color:var(--text3);margin-bottom:10px;text-align:center;padding:10px 0">Agregá líneas de mano de obra o repuestos</p>';
     calcTotal(); return;
   }
-  el.innerHTML = items.map(it => `
+  el.innerHTML = items.map(it => {
+    const subtotal  = (it.qty||1)*(it.price||0);
+    const costTotal = (it.qty||1)*(it.cost||0);
+    const ganancia  = it.type==='part' && it.cost ? subtotal - costTotal : 0;
+    const margenPct = it.type==='part' && it.cost && it.price
+      ? Math.round((it.price - it.cost)/it.cost*100) : null;
+
+    const partExtra = it.type==='part' ? `
+      <div style="margin-bottom:7px">
+        <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Costo proveedor ₡</label>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center">
+          <input type="number" placeholder="Costo ₡" value="${it.cost||''}"
+            oninput="updateF(${it.id},'cost',+this.value||0);renderItems()"
+            style="font-size:13px">
+          <div style="display:flex;gap:4px">
+            ${[10,20,30].map(p=>`<button onclick="applyMargin(${it.id},${p})"
+              style="padding:4px 8px;font-size:11px;font-weight:700;border-radius:6px;border:1.5px solid ${margenPct===p?'#1d4ed8':'var(--border)'};background:${margenPct===p?'#1d4ed8':'var(--surface)'};color:${margenPct===p?'#fff':'var(--text)'};cursor:pointer">+${p}%</button>`).join('')}
+          </div>
+        </div>
+        ${margenPct!==null ? `<div style="font-size:11px;color:#059669;margin-top:3px">Margen aplicado: ${margenPct}% &nbsp;·&nbsp; Ganancia: ₡${ganancia.toLocaleString()}</div>` : ''}
+      </div>` : '';
+
+    return `
     <div id="item-card-${it.id}" style="background:var(--surface2);border-radius:10px;padding:10px;margin-bottom:8px;border:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
         <span class="item-label ${it.type==='labor'?'lbl-labor':'lbl-part'}">${it.type==='labor'?'Mano de obra':'Repuesto'}</span>
         <button class="rm-btn" onclick="removeItem(${it.id})">×</button>
       </div>
       <input type="text" placeholder="${it.type==='labor'?'Descripción del trabajo':'Nombre del repuesto / marca'}" value="${escHtml(it.desc)}" oninput="updateF(${it.id},'desc',this.value)" style="margin-bottom:7px;font-size:14px">
+      ${partExtra}
       <div style="display:grid;grid-template-columns:80px 1fr;gap:8px;align-items:center">
-        <input type="number" placeholder="Cant" value="${it.qty}" min="1" oninput="updateF(${it.id},'qty',+this.value||1)" style="font-size:14px">
-        <input type="number" placeholder="Precio unitario ₡" value="${it.price||''}" oninput="updateF(${it.id},'price',+this.value||0)" style="font-size:14px">
+        <input type="number" placeholder="Cant" value="${it.qty}" min="1" oninput="updateF(${it.id},'qty',+this.value||1);renderItems()" style="font-size:14px">
+        <input type="number" placeholder="Precio venta ₡" value="${it.price||''}" oninput="updateF(${it.id},'price',+this.value||0);renderItems()" style="font-size:14px">
       </div>
-      <div style="text-align:right;font-size:13px;color:var(--text2);margin-top:6px">Subtotal: <strong>₡${((it.qty||1)*(it.price||0)).toLocaleString()}</strong></div>
-    </div>
-  `).join('');
+      <div style="text-align:right;font-size:13px;color:var(--text2);margin-top:6px">Subtotal: <strong>₡${subtotal.toLocaleString()}</strong></div>
+    </div>`;
+  }).join('');
   calcTotal();
 }
 
 function calcTotal() {
   const t = items.reduce((s,i) => s + (i.qty||1)*(i.price||0), 0);
   document.getElementById('total-show').textContent = '₡' + t.toLocaleString();
+  const mo      = items.filter(i=>i.type==='labor').reduce((s,i)=>s+(i.qty||1)*(i.price||0),0);
+  const venRep  = items.filter(i=>i.type==='part').reduce((s,i)=>s+(i.qty||1)*(i.price||0),0);
+  const costRep = items.filter(i=>i.type==='part'&&i.cost).reduce((s,i)=>s+(i.qty||1)*(i.cost||0),0);
+  const ganRep  = venRep - costRep;
+  const hayCosto = items.some(i=>i.type==='part' && i.cost);
+  const utilEl = document.getElementById('utilidad-box');
+  if(!utilEl) return;
+  if(!hayCosto || t===0) { utilEl.style.display='none'; return; }
+  const util = mo + ganRep;
+  utilEl.style.display = 'block';
+  utilEl.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#065f46;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">💰 Desglose de utilidad</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+      <div style="background:#fff;border-radius:8px;padding:8px">
+        <div style="font-size:10px;color:#666;margin-bottom:2px">Mano de obra</div>
+        <div style="font-size:14px;font-weight:700;color:#e53e3e">₡${mo.toLocaleString()}</div>
+      </div>
+      <div style="background:#fff;border-radius:8px;padding:8px">
+        <div style="font-size:10px;color:#666;margin-bottom:2px">Gan. repuestos</div>
+        <div style="font-size:14px;font-weight:700;color:#2563eb">₡${ganRep.toLocaleString()}</div>
+      </div>
+      <div style="background:#fff;border-radius:8px;padding:8px">
+        <div style="font-size:10px;color:#666;margin-bottom:2px">Utilidad total</div>
+        <div style="font-size:15px;font-weight:800;color:#059669">₡${util.toLocaleString()}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#6b7280;text-align:center;margin-top:6px">Costo total repuestos: ₡${costRep.toLocaleString()}</div>
+  `;
 }
 
 // ── WHATSAPP ──
@@ -1536,6 +1595,7 @@ function pdfHeader() {
       <div class="brand">Avendaño AutoCheck</div>
       <div class="subbrand">Inspección y mantenimiento vehicular a domicilio</div>
       <div class="subbrand">Costa Rica &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'})}</div>
+      <div class="subbrand">📞 6040-4237</div>
     </div>
   </div>`;
 }

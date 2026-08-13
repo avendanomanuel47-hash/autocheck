@@ -1011,8 +1011,51 @@ function updateF(id, field, val) {
 function applyMargin(id, pct) {
   const it = items.find(x => x.id === id);
   if(!it || !it.cost) { toast('Ingresá el costo primero'); return; }
-  updateF(id, 'price', Math.round(it.cost * (1 + pct/100)));
-  renderItems();
+  const precio = Math.round(it.cost * (1 + pct/100));
+  updateF(id, 'price', precio);
+  // Update price input without full redraw
+  const card = document.getElementById('item-card-' + id);
+  if(card) {
+    const priceInput = card.querySelector('.item-price');
+    if(priceInput) priceInput.value = precio;
+  }
+  updateItemDisplay(id);
+  calcTotal();
+}
+
+function updateItemDisplay(id) {
+  const it = items.find(x => x.id === id);
+  if(!it) return;
+  const card = document.getElementById('item-card-' + id);
+  if(!card) return;
+
+  const subtotal  = (it.qty||1)*(it.price||0);
+  const costTotal = (it.qty||1)*(it.cost||0);
+  const ganancia  = it.type==='part' && it.cost ? subtotal - costTotal : 0;
+  const margenPct = it.type==='part' && it.cost && it.price
+    ? Math.round((it.price - it.cost)/it.cost*100) : null;
+
+  // Update subtotal
+  const subEl = card.querySelector('.item-subtotal');
+  if(subEl) subEl.innerHTML = '₡' + subtotal.toLocaleString();
+
+  // Update margin info
+  const margenEl = card.querySelector('.item-margen');
+  if(margenEl) {
+    margenEl.textContent = margenPct !== null
+      ? 'Margen aplicado: ' + margenPct + '% · Ganancia: ₡' + ganancia.toLocaleString()
+      : '';
+    margenEl.style.display = margenPct !== null ? 'block' : 'none';
+  }
+
+  // Update margin buttons highlight
+  card.querySelectorAll('.margin-btn').forEach(btn => {
+    const p = parseInt(btn.dataset.pct);
+    const active = margenPct === p;
+    btn.style.background = active ? '#1d4ed8' : 'var(--surface)';
+    btn.style.color = active ? '#fff' : 'var(--text)';
+    btn.style.borderColor = active ? '#1d4ed8' : 'var(--border)';
+  });
 }
 
 function renderItems() {
@@ -1033,14 +1076,14 @@ function renderItems() {
         <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Costo proveedor ₡</label>
         <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center">
           <input type="number" placeholder="Costo ₡" value="${it.cost||''}"
-            oninput="updateF(${it.id},'cost',+this.value||0);renderItems()"
+            oninput="updateF(${it.id},'cost',+this.value||0);updateItemDisplay(${it.id});calcTotal()"
             style="font-size:13px">
           <div style="display:flex;gap:4px">
-            ${[10,20,30].map(p=>`<button onclick="applyMargin(${it.id},${p})"
+            ${[10,20,30].map(p=>`<button class="margin-btn" data-pct="${p}" onclick="applyMargin(${it.id},${p})"
               style="padding:4px 8px;font-size:11px;font-weight:700;border-radius:6px;border:1.5px solid ${margenPct===p?'#1d4ed8':'var(--border)'};background:${margenPct===p?'#1d4ed8':'var(--surface)'};color:${margenPct===p?'#fff':'var(--text)'};cursor:pointer">+${p}%</button>`).join('')}
           </div>
         </div>
-        ${margenPct!==null ? `<div style="font-size:11px;color:#059669;margin-top:3px">Margen aplicado: ${margenPct}% &nbsp;·&nbsp; Ganancia: ₡${ganancia.toLocaleString()}</div>` : ''}
+        <div class="item-margen" style="font-size:11px;color:#059669;margin-top:3px;display:${margenPct!==null?'block':'none'}">${margenPct!==null?'Margen aplicado: '+margenPct+'% · Ganancia: ₡'+ganancia.toLocaleString():''}</div>
       </div>` : '';
 
     return `
@@ -1052,10 +1095,14 @@ function renderItems() {
       <input type="text" placeholder="${it.type==='labor'?'Descripción del trabajo':'Nombre del repuesto / marca'}" value="${escHtml(it.desc)}" oninput="updateF(${it.id},'desc',this.value)" style="margin-bottom:7px;font-size:14px">
       ${partExtra}
       <div style="display:grid;grid-template-columns:80px 1fr;gap:8px;align-items:center">
-        <input type="number" placeholder="Cant" value="${it.qty}" min="1" oninput="updateF(${it.id},'qty',+this.value||1);renderItems()" style="font-size:14px">
-        <input type="number" placeholder="Precio venta ₡" value="${it.price||''}" oninput="updateF(${it.id},'price',+this.value||0);renderItems()" style="font-size:14px">
+        <input type="number" placeholder="Cant" value="${it.qty}" min="1"
+          oninput="updateF(${it.id},'qty',+this.value||1);updateItemDisplay(${it.id});calcTotal()"
+          style="font-size:14px">
+        <input type="number" class="item-price" placeholder="Precio venta ₡" value="${it.price||''}"
+          oninput="updateF(${it.id},'price',+this.value||0);updateItemDisplay(${it.id});calcTotal()"
+          style="font-size:14px">
       </div>
-      <div style="text-align:right;font-size:13px;color:var(--text2);margin-top:6px">Subtotal: <strong>₡${subtotal.toLocaleString()}</strong></div>
+      <div style="text-align:right;font-size:13px;color:var(--text2);margin-top:6px">Subtotal: <strong class="item-subtotal">₡${subtotal.toLocaleString()}</strong></div>
     </div>`;
   }).join('');
   calcTotal();

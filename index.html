@@ -634,7 +634,7 @@ body.dark .avatar { background: #e53e3e; }
 
 <script>
 // ── STATE ──
-let db = { cotizaciones: [], lastSync: null };
+let db = { cotizaciones: [], lastSync: null, vehicleNotes: {} };
 let items = [];
 let iCount = 0;
 let scriptUrl = '';
@@ -1463,7 +1463,7 @@ function renderClients() {
         <div class="avatar">${c.nombre.charAt(0).toUpperCase()}</div>
         <div style="flex:1">
           <div class="client-name">${escHtml(c.nombre)}</div>
-          <div class="client-meta">${escHtml(c.vehiculo||'—')} · ${escHtml(c.placa||'—')}${itvBadge(c.placa)}</div>
+          <div class="client-meta">${escHtml(c.vehiculo||'—')} · ${escHtml(c.placa||'—')}${itvBadge(c.placa)}${maintBadge(c.placa)}</div>
           ${c.tel?`<div class="client-meta" style="margin-top:2px">📞 ${escHtml(c.tel)}</div>`:''}
         </div>
       </div>
@@ -1917,6 +1917,143 @@ function reciboWhatsApp(id) {
   window.open(url, '_blank');
 }
 
+
+// ── VEHICLE NOTES & MAINTENANCE ──
+const MAINT_RULES = {
+  aceite_sintetico:   { km: 10000, months: 12, label: 'Aceite sintético' },
+  aceite_semisint:    { km: 8000,  months: 6,  label: 'Aceite semisintético' },
+  aceite_mineral:     { km: 5000,  months: 3,  label: 'Aceite mineral' },
+  trans_manual:       { km: 60000, months: 48, label: 'Aceite transmisión manual' },
+  trans_automatica:   { km: 40000, months: 48, label: 'Aceite transmisión automática' },
+  trans_cvt:          { km: 40000, months: 48, label: 'Aceite transmisión CVT' },
+};
+
+function detectMaintType(items) {
+  const descs = (items||[]).map(i => (i.desc||'').toLowerCase()).join(' ');
+  const results = [];
+  // Engine oil
+  if(/aceite.*motor|filtro.*motor|cambio.*aceite|oil.*change/.test(descs)) {
+    results.push('aceite'); // type determined by vehicleNotes
+  }
+  // Transmission
+  if(/cvt/.test(descs)) results.push('trans_cvt');
+  else if(/transmisi[oó]n.*autom[aá]tica|atf|automatic.*trans/.test(descs)) results.push('trans_automatica');
+  else if(/transmisi[oó]n.*manual|manual.*trans/.test(descs)) results.push('trans_manual');
+  return results;
+}
+
+function getMaintRuleForPlaca(placa, maintType) {
+  if(maintType === 'aceite') {
+    const notes = (db.vehicleNotes||{})[placa] || {};
+    const tipo = notes.tipoAceite || 'semisint';
+    return MAINT_RULES['aceite_' + tipo];
+  }
+  return MAINT_RULES[maintType];
+}
+
+function calcNextService(fechaRealizado, kmRealizado, placa, maintType) {
+  const rule = getMaintRuleForPlaca(placa, maintType);
+  if(!rule) return null;
+  const base = new Date(fechaRealizado);
+  const nextDate = new Date(base);
+  nextDate.setMonth(nextDate.getMonth() + rule.months);
+  const nextKm = kmRealizado ? Number(kmRealizado) + rule.km : null;
+  return { nextDate, nextKm, rule };
+}
+
+function getMaintenanceStatus(placa) {
+  if(!placa) return [];
+  const cots = db.cotizaciones
+    .filter(c => c.placa === placa && c.estado === 'realizado' && c.workFecha)
+    .sort((a,b) => new Date(b.workFecha) - new Date(a.workFecha));
+
+  const results = [];
+  const seen = new Set();
+  for(const c of cots) {
+    const types = detectMaintType(c.items);
+    for(const t of types) {
+      if(seen.has(t)) continue;
+      seen.add(t);
+      const svc = calcNextService(c.workFecha, c.workKm, placa, t);
+      if(!svc) continue;
+      const now = new Date();
+      const daysLeft = Math.round((svc.nextDate - now) / 86400000);
+      let status = 'ok';
+      if(daysLeft < 0) status = 'vencido';
+      else if(daysLeft <= 30) status = 'proximo';
+      results.push({
+        type: t, label: svc.rule.label,
+        nextDate: svc.nextDate, nextKm: svc.nextKm,
+        daysLeft, status,
+        lastDate: c.workFecha, lastKm: c.workKm
+      });
+    }
+  }
+  return results;
+}
+
+function maintBadge(placa) {
+  const svcs = getMaintenanceStatus(placa);
+  if(!svcs.length) return '';
+  const worst = svcs.find(s=>s.status==='vencido') || svcs.find(s=>s.status==='proximo');
+  if(!worst) return '';
+  return worst.status === 'vencido'
+    ? ' <span style="color:#e53e3e;font-size:12px">🔴 Mant.</span>'
+    : ' <span style="color:#d97706;font-size:12px">🟡 Mant.</span>';
+}
+
+function maintDetailPanel(placa) {
+  const svcs = getMaintenanceStatus(placa);
+  if(!svcs.length) return '';
+  const rows = svcs.map(s => {
+    const icon = s.status==='vencido' ? '🔴' : s.status==='proximo' ? '🟡' : '🟢';
+    const msg = s.status==='vencido'
+      ? `Vencido hace ${Math.abs(s.daysLeft)} días`
+      : s.status==='proximo'
+      ? `Próximo en ${s.daysLeft} días`
+      : `Al día (${s.daysLeft} días restantes)`;
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:600">${icon} ${s.label}</span>
+        <span style="font-size:11px;color:var(--text3)">${fmtDate(s.nextDate.toISOString())}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${msg}${s.nextKm ? ' · Próx. km: '+s.nextKm.toLocaleString() : ''}</div>
+    </div>`;
+  }).join('');
+  return `<div class="card mb14">
+    <div class="section-label" style="margin-bottom:8px">🔧 próximos mantenimientos</div>
+    ${rows}
+  </div>`;
+}
+
+function openVehicleNotes(placa, vehiculo) {
+  const notes = (db.vehicleNotes||{})[placa] || {};
+  const overlay = document.getElementById('vnotes-overlay');
+  document.getElementById('vn-title').textContent = placa + ' — ' + (vehiculo||'');
+  document.getElementById('vn-placa').value = placa;
+  document.getElementById('vn-viscosidad').value = notes.viscosidad || '';
+  document.getElementById('vn-tipoAceite').value = notes.tipoAceite || 'semisint';
+  document.getElementById('vn-marcaAceite').value = notes.marcaAceite || '';
+  document.getElementById('vn-marcaFiltro').value = notes.marcaFiltro || '';
+  document.getElementById('vn-obs').value = notes.obs || '';
+  overlay.classList.add('open');
+}
+
+function saveVehicleNotes() {
+  const placa = document.getElementById('vn-placa').value;
+  if(!db.vehicleNotes) db.vehicleNotes = {};
+  db.vehicleNotes[placa] = {
+    viscosidad:  document.getElementById('vn-viscosidad').value,
+    tipoAceite:  document.getElementById('vn-tipoAceite').value,
+    marcaAceite: document.getElementById('vn-marcaAceite').value,
+    marcaFiltro: document.getElementById('vn-marcaFiltro').value,
+    obs:         document.getElementById('vn-obs').value,
+  };
+  saveLocal();
+  document.getElementById('vnotes-overlay').classList.remove('open');
+  toast('✅ Notas del vehículo guardadas');
+}
+
 function closeDetail() {
   document.getElementById('detail-overlay').classList.remove('open');
   renderCots();
@@ -1972,6 +2109,7 @@ function openClientDetail(nombre) {
     </div>
 
     ${itvDetailPanel(cots[0]?.placa||'')}
+    ${maintDetailPanel(cots[0]?.placa||'')}
     ${vehiculos.length <= 1 ?
       `<button class="btn btn-primary btn-full mb14" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(ultimoVehiculo)}','${escHtml(ultimaPlaca)}')">
         ➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])}
@@ -2000,6 +2138,22 @@ function openClientDetail(nombre) {
         return `<button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:8px" onclick="pdfHistorialVehiculo('${escHtml(nombre)}','${escHtml(pl)}')">📄 Historial PDF — ${escHtml(pl)} ${escHtml(vh)}</button>`;
       }).join('')}
     </div>
+
+    ${[...new Set(cots.map(c => (c.placa||'')+'|||'+(c.vehiculo||'')).filter(x=>x.startsWith('|')||x.indexOf('|||')>0))].map(v => {
+      const parts = v.split('|||'); const pl = parts[0]; const vh = parts[1]||'';
+      const notes = (db.vehicleNotes||{})[pl] || {};
+      const tipoLabel = notes.tipoAceite==='sintetico'?'Sintético':notes.tipoAceite==='mineral'?'Mineral':'Semisintético';
+      return `<div class="card mb14">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span class="section-label" style="margin:0">🚗 ${escHtml(pl)}${vh?' — '+escHtml(vh):''}</span>
+          <button class="btn" style="padding:4px 10px;font-size:12px;background:var(--surface2)" onclick="openVehicleNotes('${escHtml(pl)}','${escHtml(vh)}')">⚙️ Notas</button>
+        </div>
+        ${notes.viscosidad ? `<div style="font-size:12px;color:var(--text2)">🛢 ${escHtml(notes.viscosidad.toUpperCase())} · ${tipoLabel}${notes.marcaAceite?' · '+escHtml(notes.marcaAceite):''}</div>` : ''}
+        ${notes.marcaFiltro ? `<div style="font-size:12px;color:var(--text2);margin-top:2px">🔩 Filtro: ${escHtml(notes.marcaFiltro)}</div>` : ''}
+        ${notes.obs ? `<div style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic">${escHtml(notes.obs)}</div>` : ''}
+        ${!notes.viscosidad&&!notes.obs&&!notes.marcaFiltro ? `<div style="font-size:12px;color:var(--text3)">Sin notas — tocá ⚙️ para agregar</div>` : ''}
+      </div>`;
+    }).join('')}
 
     <div class="row2 mb14" style="gap:10px">
       <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editClient('${escHtml(nombre)}','${escHtml(tel)}')">✏️ Editar cliente</button>

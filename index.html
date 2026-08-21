@@ -1964,7 +1964,7 @@ function calcNextService(fechaRealizado, kmRealizado, placa, maintType) {
 function getMaintenanceStatus(placa) {
   if(!placa) return [];
   const cots = db.cotizaciones
-    .filter(c => c.placa === placa && c.estado === 'realizado' && c.workFecha)
+    .filter(c => c.placa === placa && c.estado === 'realizado' && (c.workFecha || c.fecha))
     .sort((a,b) => new Date(b.workFecha) - new Date(a.workFecha));
 
   const results = [];
@@ -1974,7 +1974,7 @@ function getMaintenanceStatus(placa) {
     for(const t of types) {
       if(seen.has(t)) continue;
       seen.add(t);
-      const svc = calcNextService(c.workFecha, c.workKm, placa, t);
+      const svc = calcNextService(c.workFecha || c.fecha, c.workKm || c.km, placa, t);
       if(!svc) continue;
       const now = new Date();
       const daysLeft = Math.round((svc.nextDate - now) / 86400000);
@@ -2109,7 +2109,7 @@ function openClientDetail(nombre) {
     </div>
 
     ${itvDetailPanel(cots[0]?.placa||'')}
-    ${maintDetailPanel(cots[0]?.placa||'')}
+    ${[...new Set(cots.map(c=>c.placa).filter(Boolean))].map(pl => maintDetailPanel(pl)).join('')}
     ${vehiculos.length <= 1 ?
       `<button class="btn btn-primary btn-full mb14" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(ultimoVehiculo)}','${escHtml(ultimaPlaca)}')">
         ➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])}
@@ -2139,7 +2139,7 @@ function openClientDetail(nombre) {
       }).join('')}
     </div>
 
-    ${[...new Set(cots.map(c => (c.placa||'')+'|||'+(c.vehiculo||'')).filter(x=>x.startsWith('|')||x.indexOf('|||')>0))].map(v => {
+    ${[...new Set(cots.map(c => (c.placa||'')+'|||'+(c.vehiculo||'')).filter(x=>x.length>3 && x.indexOf('|||')>0 && x.split('|||')[0].length>0))].map(v => {
       const parts = v.split('|||'); const pl = parts[0]; const vh = parts[1]||'';
       const notes = (db.vehicleNotes||{})[pl] || {};
       const tipoLabel = notes.tipoAceite==='sintetico'?'Sintético':notes.tipoAceite==='mineral'?'Mineral':'Semisintético';

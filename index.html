@@ -653,6 +653,8 @@ function init() {
     const saved = localStorage.getItem('autocheck_v2');
     if(saved) db = JSON.parse(saved);
   } catch(e){}
+  // Ensure new fields exist in old dbs
+  if(!db.vehicleNotes) db.vehicleNotes = {};
 
   // Auto-set cloud config if not already set
   if(!localStorage.getItem('autocheck_script')) {
@@ -1931,14 +1933,14 @@ const MAINT_RULES = {
 function detectMaintType(items) {
   const descs = (items||[]).map(i => (i.desc||'').toLowerCase()).join(' ');
   const results = [];
-  // Engine oil
-  if(/aceite.*motor|filtro.*motor|cambio.*aceite|oil.*change/.test(descs)) {
-    results.push('aceite'); // type determined by vehicleNotes
+  // Engine oil — broad match
+  if(/aceite|filtro.*motor|motor.*filtro|oil|cambio.*aceite|aceite.*cambio/.test(descs)) {
+    results.push('aceite');
   }
   // Transmission
   if(/cvt/.test(descs)) results.push('trans_cvt');
-  else if(/transmisi[oó]n.*autom[aá]tica|atf|automatic.*trans/.test(descs)) results.push('trans_automatica');
-  else if(/transmisi[oó]n.*manual|manual.*trans/.test(descs)) results.push('trans_manual');
+  else if(/transmisi[oó]n.*autom[aá]tica|autom[aá]tica.*transmisi[oó]n|atf/.test(descs)) results.push('trans_automatica');
+  else if(/transmisi[oó]n.*manual|manual.*transmisi[oó]n/.test(descs)) results.push('trans_manual');
   return results;
 }
 
@@ -1964,8 +1966,8 @@ function calcNextService(fechaRealizado, kmRealizado, placa, maintType) {
 function getMaintenanceStatus(placa) {
   if(!placa) return [];
   const cots = db.cotizaciones
-    .filter(c => c.placa === placa && c.estado === 'realizado' && (c.workFecha || c.fecha))
-    .sort((a,b) => new Date(b.workFecha) - new Date(a.workFecha));
+    .filter(c => c.placa === placa && c.estado === 'realizado')
+    .sort((a,b) => new Date(b.workFecha||b.fecha) - new Date(a.workFecha||a.fecha));
 
   const results = [];
   const seen = new Set();
@@ -2004,7 +2006,10 @@ function maintBadge(placa) {
 
 function maintDetailPanel(placa) {
   const svcs = getMaintenanceStatus(placa);
-  if(!svcs.length) return '';
+  if(!svcs.length) return `<div class="card mb14" style="border-left:3px solid var(--border)">
+    <div class="section-label" style="margin-bottom:6px">🔧 próximos mantenimientos</div>
+    <div style="font-size:12px;color:var(--text3)">Sin historial de mantenimiento registrado para esta placa.</div>
+  </div>`;
   const rows = svcs.map(s => {
     const icon = s.status==='vencido' ? '🔴' : s.status==='proximo' ? '🟡' : '🟢';
     const msg = s.status==='vencido'
@@ -2028,6 +2033,7 @@ function maintDetailPanel(placa) {
 
 function openVehicleNotes(placa, vehiculo) {
   const notes = (db.vehicleNotes||{})[placa] || {};
+  if(!db.vehicleNotes) db.vehicleNotes = {};
   const overlay = document.getElementById('vnotes-overlay');
   document.getElementById('vn-title').textContent = placa + ' — ' + (vehiculo||'');
   document.getElementById('vn-placa').value = placa;

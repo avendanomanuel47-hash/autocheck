@@ -2031,6 +2031,12 @@ function maintDetailPanel(placa) {
   </div>`;
 }
 
+// Global handler for data-action buttons inside templates
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action="vnotes"]');
+  if(btn) openVehicleNotes(btn.dataset.placa, btn.dataset.vh);
+});
+
 function openVehicleNotes(placa, vehiculo) {
   const notes = (db.vehicleNotes||{})[placa] || {};
   if(!db.vehicleNotes) db.vehicleNotes = {};
@@ -2154,7 +2160,7 @@ function openClientDetail(nombre) {
         return `<div class="card mb14">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <span class="section-label" style="margin:0">🚗 ${escHtml(pl)}${vh?' — '+escHtml(vh):''}</span>
-            <button class="btn" style="padding:4px 10px;font-size:12px;background:var(--surface2)" onclick="openVehicleNotes('${escHtml(pl)}','${escHtml(vh)}')">⚙️ Notas</button>
+            <button class="btn" style="padding:4px 10px;font-size:12px;background:var(--surface2)" data-action="vnotes" data-placa="${escHtml(pl)}" data-vh="${escHtml(vh)}">⚙️ Notas</button>
           </div>
           ${notes.viscosidad ? `<div style="font-size:12px;color:var(--text2)">🛢 ${escHtml(notes.viscosidad.toUpperCase())} · ${tipoLabel}${notes.marcaAceite?' · '+escHtml(notes.marcaAceite):''}</div>` : ''}
           ${notes.marcaFiltro ? `<div style="font-size:12px;color:var(--text2);margin-top:2px">🔩 Filtro: ${escHtml(notes.marcaFiltro)}</div>` : ''}

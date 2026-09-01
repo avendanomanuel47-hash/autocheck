@@ -2031,12 +2031,6 @@ function maintDetailPanel(placa) {
   </div>`;
 }
 
-// Global handler for data-action buttons inside templates
-document.addEventListener('click', function(e) {
-  const btn = e.target.closest('[data-action="vnotes"]');
-  if(btn) openVehicleNotes(btn.dataset.placa, btn.dataset.vh);
-});
-
 function openVehicleNotes(placa, vehiculo) {
   const notes = (db.vehicleNotes||{})[placa] || {};
   if(!db.vehicleNotes) db.vehicleNotes = {};
@@ -2202,6 +2196,7 @@ function openClientDetail(nombre) {
   `;
   document.getElementById('client-overlay').classList.add('open');
   document.getElementById('client-overlay').scrollTop = 0;
+  renderVehicleNoteCards(cots);
 }
 
 function nuevaCotizacionPara(nombre, tel, vehiculo, placa) {

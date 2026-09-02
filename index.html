@@ -2032,16 +2032,17 @@ function maintDetailPanel(placa) {
 }
 
 function openVehicleNotes(placa, vehiculo) {
-  const notes = (db.vehicleNotes||{})[placa] || {};
   if(!db.vehicleNotes) db.vehicleNotes = {};
-  const overlay = document.getElementById('vnotes-overlay');
-  document.getElementById('vn-title').textContent = placa + ' — ' + (vehiculo||'');
-  document.getElementById('vn-placa').value = placa;
-  document.getElementById('vn-viscosidad').value = notes.viscosidad || '';
-  document.getElementById('vn-tipoAceite').value = notes.tipoAceite || 'semisint';
-  document.getElementById('vn-marcaAceite').value = notes.marcaAceite || '';
-  document.getElementById('vn-marcaFiltro').value = notes.marcaFiltro || '';
-  document.getElementById('vn-obs').value = notes.obs || '';
+  var notes = db.vehicleNotes[placa] || {};
+  var overlay = document.getElementById('vnotes-overlay');
+  if(!overlay) { alert('Error: panel vnotes-overlay no encontrado en DOM'); return; }
+  document.getElementById('vn-title').textContent = (placa||'') + (vehiculo ? ' — '+vehiculo : '');
+  document.getElementById('vn-placa').value = placa||'';
+  document.getElementById('vn-viscosidad').value = notes.viscosidad||'';
+  document.getElementById('vn-tipoAceite').value = notes.tipoAceite||'semisint';
+  document.getElementById('vn-marcaAceite').value = notes.marcaAceite||'';
+  document.getElementById('vn-marcaFiltro').value = notes.marcaFiltro||'';
+  document.getElementById('vn-obs').value = notes.obs||'';
   overlay.classList.add('open');
 }
 
@@ -2163,6 +2164,8 @@ function openClientDetail(nombre) {
         </div>`;
       }).join('');
     })()}
+
+    <div id="vnotes-cards"></div>
 
     <div class="row2 mb14" style="gap:10px">
       <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editClient('${escHtml(nombre)}','${escHtml(tel)}')">✏️ Editar cliente</button>

@@ -2031,6 +2031,39 @@ function maintDetailPanel(placa) {
   </div>`;
 }
 
+
+function renderVehicleNoteCards(cots) {
+  var el = document.getElementById('vnotes-cards');
+  if(!el) return;
+  var placaMap = {};
+  cots.forEach(function(c) { if(c.placa) placaMap[c.placa] = c.vehiculo||''; });
+  var entries = Object.entries(placaMap);
+  if(!entries.length) { el.innerHTML = ''; return; }
+  var out = '';
+  entries.forEach(function(entry) {
+    var pl = entry[0], vh = entry[1];
+    var notes = (db.vehicleNotes||{})[pl] || {};
+    var tipoLabel = notes.tipoAceite==='sintetico'?'Sintético':notes.tipoAceite==='mineral'?'Mineral':'Semisintético';
+    var info = '';
+    if(notes.viscosidad) info += '<div style="font-size:12px;color:var(--text2)">🛢 '+escHtml(notes.viscosidad.toUpperCase())+' · '+tipoLabel+(notes.marcaAceite?' · '+escHtml(notes.marcaAceite):'')+' </div>';
+    if(notes.marcaFiltro) info += '<div style="font-size:12px;color:var(--text2);margin-top:2px">🔩 Filtro: '+escHtml(notes.marcaFiltro)+'</div>';
+    if(notes.obs) info += '<div style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic">'+escHtml(notes.obs)+'</div>';
+    if(!notes.viscosidad&&!notes.obs&&!notes.marcaFiltro) info += '<div style="font-size:12px;color:var(--text3)">Sin notas — tocá ⚙️ para agregar</div>';
+    out += '<div class="card mb14">'
+         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+         +'<span class="section-label" style="margin:0">🚗 '+escHtml(pl)+(vh?' — '+escHtml(vh):'')+' </span>'
+         +'<button class="btn" style="padding:4px 10px;font-size:12px;background:var(--surface2)" data-vnplaca="'+escHtml(pl)+'" data-vnvh="'+escHtml(vh)+'">⚙️ Notas</button>'
+         +'</div>'+info+'</div>';
+  });
+  el.innerHTML = out;
+  // Attach click events after rendering
+  el.querySelectorAll('[data-vnplaca]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      openVehicleNotes(this.getAttribute('data-vnplaca'), this.getAttribute('data-vnvh'));
+    });
+  });
+}
+
 function openVehicleNotes(placa, vehiculo) {
   if(!db.vehicleNotes) db.vehicleNotes = {};
   var notes = db.vehicleNotes[placa] || {};

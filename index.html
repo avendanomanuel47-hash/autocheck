@@ -2193,25 +2193,6 @@ function openClientDetail(nombre) {
       }).join('')}
     </div>
 
-    ${(()=>{
-      const placaMap = {};
-      cots.forEach(c => { if(c.placa) placaMap[c.placa] = c.vehiculo||''; });
-      return Object.entries(placaMap).map(([pl,vh]) => {
-        const notes = (db.vehicleNotes||{})[pl] || {};
-        const tipoLabel = notes.tipoAceite==='sintetico'?'Sintético':notes.tipoAceite==='mineral'?'Mineral':'Semisintético';
-        return `<div class="card mb14">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <span class="section-label" style="margin:0">🚗 ${escHtml(pl)}${vh?' — '+escHtml(vh):''}</span>
-            <button class="btn" style="padding:4px 10px;font-size:12px;background:var(--surface2)" data-action="vnotes" data-placa="${escHtml(pl)}" data-vh="${escHtml(vh)}">⚙️ Notas</button>
-          </div>
-          ${notes.viscosidad ? `<div style="font-size:12px;color:var(--text2)">🛢 ${escHtml(notes.viscosidad.toUpperCase())} · ${tipoLabel}${notes.marcaAceite?' · '+escHtml(notes.marcaAceite):''}</div>` : ''}
-          ${notes.marcaFiltro ? `<div style="font-size:12px;color:var(--text2);margin-top:2px">🔩 Filtro: ${escHtml(notes.marcaFiltro)}</div>` : ''}
-          ${notes.obs ? `<div style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic">${escHtml(notes.obs)}</div>` : ''}
-          ${!notes.viscosidad&&!notes.obs&&!notes.marcaFiltro ? `<div style="font-size:12px;color:var(--text3)">Sin notas — tocá ⚙️ para agregar</div>` : ''}
-        </div>`;
-      }).join('');
-    })()}
-
     <div id="vnotes-cards"></div>
 
     <div class="row2 mb14" style="gap:10px">

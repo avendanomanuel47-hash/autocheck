@@ -462,6 +462,19 @@ body.dark .avatar { background: #e53e3e; }
         <textarea id="q-obs" placeholder="Estado del vehículo, advertencias, notas para el expediente..."></textarea>
       </div>
 
+      <div class="mb14">
+        <label>📷 Foto del vehículo / diagnóstico</label>
+        <div id="foto-preview-wrap" style="display:none;margin-bottom:8px;position:relative">
+          <img id="foto-preview" style="width:100%;border-radius:10px;max-height:200px;object-fit:cover">
+          <button onclick="removeFoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer">×</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--surface2);border:1.5px dashed var(--border);border-radius:10px;padding:12px;justify-content:center">
+          <span style="font-size:20px">📷</span>
+          <span style="font-size:13px;color:var(--text2)">Tomar foto o elegir de galería</span>
+          <input type="file" id="q-foto" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(this)">
+        </label>
+      </div>
+
       <div id="wa-preview-wrap" style="display:none">
         <div class="section-label">mensaje para WhatsApp</div>
         <div class="wa-box" id="wa-text"></div>
@@ -1320,12 +1333,14 @@ async function guardarCotizacion() {
   if(editMode) {
     cot = db.cotizaciones.find(x => x.id === editingId);
     if(!cot) { editingId = null; btn.disabled = false; btn.textContent = '💾 Guardar cotización'; toast('⚠️ No se encontró la cotización original'); return; }
+    const newFoto = getFotoBase64(); if(newFoto) cot.foto = newFoto;
     Object.assign(cot, { cliente, tel: gv('q-tel'), cedula: gv('q-cedula')||'', vehiculo, placa, km: gv('q-km'), tipo: gv('q-tipo'), obs: gv('q-obs'), items: JSON.parse(JSON.stringify(items)), total });
   } else {
     cot = {
       id: Date.now(),
       fecha: new Date().toISOString(),
       cliente, tel: gv('q-tel'), cedula: gv('q-cedula')||'', vehiculo, placa,
+    foto: getFotoBase64(),
       km: gv('q-km'), tipo: gv('q-tipo'), obs: gv('q-obs'),
       items: JSON.parse(JSON.stringify(items)),
       total, estado: 'pendiente',
@@ -1340,6 +1355,7 @@ async function guardarCotizacion() {
   // reset form
   clearValidationErrors();
   ['q-cliente','q-tel','q-cedula','q-marca','q-modelo','q-anio','q-placa','q-km','q-tipo','q-obs'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  removeFoto();
   items = []; iCount = 0;
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
   renderItems();
@@ -1551,6 +1567,11 @@ function openDetail(id) {
   ` : '';
 
   document.getElementById('detail-body').innerHTML = `
+    ${c.foto ? `<div class="card mb14" style="padding:0;overflow:hidden">
+      <img src="\${c.foto}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px">
+      <div style="padding:8px 12px;font-size:12px;color:var(--text3)">📷 Foto del diagnóstico</div>
+    </div>` : ''}
+
     <div class="card mb14">
       <div class="section-label" style="margin-bottom:10px">datos del cliente</div>
       <div class="info-grid">
@@ -1595,6 +1616,7 @@ function openDetail(id) {
 
     <div class="card mb14">
       <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion(${id})">📄 Descargar cotización PDF</button>
+      <button class="btn btn-full" style="background:#7c3aed;color:#fff;margin-bottom:10px" onclick="duplicarCotizacion(${id})">📋 Duplicar cotización</button>
       <div class="row2" style="gap:10px">
         <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion(${id})">✏️ Editar cotización</button>
         <button class="btn btn-full btn-danger" onclick="deleteCotizacion(${id})">🗑️ Borrar</button>
@@ -1710,6 +1732,25 @@ function pdfCotizacion(id) {
     </table>
     ${c.obs ? `<p style="font-size:12px;color:#555;margin-bottom:14px;line-height:1.5"><strong>Observaciones:</strong> ${escHtml(c.obs)}</p>` : ''}
     ${citaHtml}${workHtml}
+    ${(() => {
+      const svcs = getMaintenanceStatus(placa);
+      if(!svcs.length) return '';
+      const notes = (db.vehicleNotes||{})[placa] || {};
+      const rows = svcs.map(s => {
+        const icon = s.status==='vencido' ? '🔴' : s.status==='proximo' ? '🟡' : '🟢';
+        const msg = s.status==='vencido'
+          ? 'Vencido hace ' + Math.abs(s.daysLeft) + ' dias'
+          : 'Proximo en ' + s.daysLeft + ' dias';
+        return '<tr><td>' + icon + ' ' + s.label + '</td><td>' + fmtDate(s.nextDate.toISOString()) + '</td><td>' + msg + (s.nextKm ? ' · ' + s.nextKm.toLocaleString() + ' km' : '') + '</td></tr>';
+      }).join('');
+      let notasHtml = '';
+      if(notes.viscosidad) notasHtml += '<p style="font-size:12px;margin:4px 0"><strong>Aceite:</strong> ' + notes.viscosidad.toUpperCase() + ' · ' + (notes.tipoAceite==='sintetico'?'Sintético':notes.tipoAceite==='mineral'?'Mineral':'Semisintético') + (notes.marcaAceite?' · '+notes.marcaAceite:'') + '</p>';
+      if(notes.marcaFiltro) notasHtml += '<p style="font-size:12px;margin:4px 0"><strong>Filtro:</strong> ' + notes.marcaFiltro + '</p>';
+      if(notes.obs) notasHtml += '<p style="font-size:12px;margin:4px 0;color:#555;font-style:italic">' + notes.obs + '</p>';
+      return '<h2>Proximos Mantenimientos</h2>'
+        + '<table><thead><tr><th>Servicio</th><th>Fecha limite</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        + (notasHtml ? '<div style="background:#f8faff;border-radius:8px;padding:10px;margin-bottom:12px"><strong style="font-size:12px">Especificaciones del vehiculo:</strong>' + notasHtml + '</div>' : '');
+    })()}
     <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
     </body></html>`;
 
@@ -2106,6 +2147,56 @@ function saveVehicleNotes() {
   saveLocal();
   document.getElementById('vnotes-overlay').classList.remove('open');
   toast('✅ Notas del vehículo guardadas');
+}
+
+
+// ── DUPLICAR COTIZACIÓN ──
+function duplicarCotizacion(id) {
+  const orig = db.cotizaciones.find(x => x.id === id);
+  if(!orig) return;
+  const nueva = JSON.parse(JSON.stringify(orig)); // deep copy
+  nueva.id = Date.now();
+  nueva.fecha = new Date().toISOString();
+  nueva.estado = 'pendiente';
+  nueva.workFecha = '';
+  nueva.workKm = '';
+  nueva.workObs = '';
+  nueva.citaFecha = '';
+  nueva.citaHora = '';
+  nueva.citaDireccion = '';
+  nueva.citaDuracion = '';
+  db.cotizaciones.unshift(nueva);
+  saveLocal();
+  pushToCloud(nueva);
+  closeDetail();
+  renderCots();
+  toast('📋 Cotización duplicada — revisá y editá los detalles');
+  setTimeout(() => openDetail(nueva.id), 400);
+}
+
+
+// ── FOTO DEL VEHÍCULO ──
+function previewFoto(input) {
+  if(!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('foto-preview').src = e.target.result;
+    document.getElementById('foto-preview-wrap').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeFoto() {
+  document.getElementById('q-foto').value = '';
+  document.getElementById('foto-preview').src = '';
+  document.getElementById('foto-preview-wrap').style.display = 'none';
+}
+
+function getFotoBase64() {
+  const img = document.getElementById('foto-preview');
+  if(!img || !img.src || !img.src.startsWith('data:')) return '';
+  return img.src;
 }
 
 function closeDetail() {

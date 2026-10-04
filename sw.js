@@ -1,4 +1,4 @@
-const CACHE = 'autocheck-v5';
+const CACHE = 'autocheck-v6';
 const ASSETS = [
   './',
   './index.html',

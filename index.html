@@ -431,8 +431,14 @@ body.dark .avatar { background: #e53e3e; }
       </div>
       <div class="row2">
         <div>
-          <label>Kilometraje</label>
-          <input type="number" id="q-km" placeholder="85000">
+          <label>Kilometraje / Millaje</label>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center">
+            <input type="number" id="q-km" placeholder="85000">
+            <select id="q-kmunit" style="padding:10px 8px;font-size:13px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:600">
+              <option value="km">km</option>
+              <option value="mi">mi</option>
+            </select>
+          </div>
         </div>
         <div>
           <label>Tipo de trabajo</label>
@@ -1334,7 +1340,7 @@ async function guardarCotizacion() {
     cot = db.cotizaciones.find(x => x.id === editingId);
     if(!cot) { editingId = null; btn.disabled = false; btn.textContent = '💾 Guardar cotización'; toast('⚠️ No se encontró la cotización original'); return; }
     const newFoto = getFotoBase64(); if(newFoto) cot.foto = newFoto;
-    Object.assign(cot, { cliente, tel: gv('q-tel'), cedula: gv('q-cedula')||'', vehiculo, placa, km: gv('q-km'), tipo: gv('q-tipo'), obs: gv('q-obs'), items: JSON.parse(JSON.stringify(items)), total });
+    Object.assign(cot, { cliente, tel: gv('q-tel'), cedula: gv('q-cedula')||'', vehiculo, placa, km: gv('q-km'), kmunit: gv('q-kmunit')||'km', tipo: gv('q-tipo'), obs: gv('q-obs'), items: JSON.parse(JSON.stringify(items)), total });
   } else {
     cot = {
       id: Date.now(),
@@ -1356,6 +1362,7 @@ async function guardarCotizacion() {
   clearValidationErrors();
   ['q-cliente','q-tel','q-cedula','q-marca','q-modelo','q-anio','q-placa','q-km','q-tipo','q-obs'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   removeFoto();
+  const kuEl2 = document.getElementById('q-kmunit'); if(kuEl2) kuEl2.value = 'km';
   items = []; iCount = 0;
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
   renderItems();
@@ -1384,6 +1391,7 @@ function editCotizacion(id) {
   document.getElementById('q-anio').value = sp.anio;
   document.getElementById('q-placa').value = c.placa || '';
   document.getElementById('q-km').value = c.km || '';
+  const kuEl = document.getElementById('q-kmunit'); if(kuEl) kuEl.value = c.kmunit || 'km';
   document.getElementById('q-tipo').value = c.tipo || '';
   document.getElementById('q-obs').value = c.obs || '';
   items = (c.items || []).map(i => ({...i}));
@@ -1721,7 +1729,7 @@ function pdfCotizacion(id) {
       <div class="kv"><span class="k">Fecha:</span><span class="v">${fmtDate(c.fecha)}</span></div>
       <div class="kv"><span class="k">Vehiculo:</span><span class="v">${escHtml(c.vehiculo||'—')}</span></div>
       <div class="kv"><span class="k">Placa:</span><span class="v">${c.placa||'—'}</span></div>
-      ${c.km ? `<div class="kv"><span class="k">Km entrada:</span><span class="v">${c.km} km</span></div>` : ''}
+      ${c.km ? `<div class="kv"><span class="k">${c.kmunit==='mi'?'Millaje entrada':'Km entrada'}</span><span class="v">${c.km} ${c.kmunit||'km'}</span></div>` : ''}
       ${c.tipo ? `<div class="kv"><span class="k">Tipo:</span><span class="v">${escHtml(c.tipo)}</span></div>` : ''}
     </div>
     <h2>Detalle de Servicios</h2>
@@ -2017,7 +2025,9 @@ function getMaintenanceStatus(placa) {
     for(const t of types) {
       if(seen.has(t)) continue;
       seen.add(t);
-      const svc = calcNextService(c.workFecha || c.fecha, c.workKm || c.km, placa, t);
+      const rawKm = c.workKm || c.km;
+      const kmNorm = rawKm ? (c.kmunit==='mi' ? Math.round(Number(rawKm)*1.60934) : Number(rawKm)) : null;
+      const svc = calcNextService(c.workFecha || c.fecha, kmNorm, placa, t);
       if(!svc) continue;
       const now = new Date();
       const daysLeft = Math.round((svc.nextDate - now) / 86400000);
@@ -2063,7 +2073,7 @@ function maintDetailPanel(placa) {
         <span style="font-size:13px;font-weight:600">${icon} ${s.label}</span>
         <span style="font-size:11px;color:var(--text3)">${fmtDate(s.nextDate.toISOString())}</span>
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">${msg}${s.nextKm ? ' · Próx. km: '+s.nextKm.toLocaleString() : ''}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${msg}${s.nextKm ? ' · Próx.: '+s.nextKm.toLocaleString()+' km' : ''}</div>
     </div>`;
   }).join('');
   return `<div class="card mb14">

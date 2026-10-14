@@ -1762,11 +1762,15 @@ function pdfCotizacion(id) {
     <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
     </body></html>`;
 
-  const w = window.open('', '_blank');
-  if(!w) { toast('Permitir popups para generar PDF'); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => w.print(), 500);
+  const blob = new Blob([html], {type: 'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
 }
 
 function pdfHistorialVehiculo(cliente, placa) {
@@ -1822,11 +1826,15 @@ function pdfHistorialVehiculo(cliente, placa) {
     <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
     </body></html>`;
 
-  const w = window.open('', '_blank');
-  if(!w) { toast('Permitir popups para generar PDF'); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => w.print(), 500);
+  const blob = new Blob([html], {type: 'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
 }
 
 

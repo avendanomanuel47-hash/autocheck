@@ -1108,7 +1108,7 @@ function renderItems() {
     <div id="item-card-${it.id}" style="background:var(--surface2);border-radius:10px;padding:10px;margin-bottom:8px;border:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
         <span class="item-label ${it.type==='labor'?'lbl-labor':'lbl-part'}">${it.type==='labor'?'Mano de obra':'Repuesto'}</span>
-        <button class="rm-btn" onclick="removeItem(${it.id})">×</button>
+        <button class="rm-btn" onclick="removeItem('${it.id}')">×</button>
       </div>
       <input type="text" placeholder="${it.type==='labor'?'Descripción del trabajo':'Nombre del repuesto / marca'}" value="${escHtml(it.desc)}" oninput="updateF(${it.id},'desc',this.value)" style="margin-bottom:7px;font-size:14px">
       ${partExtra}
@@ -1460,7 +1460,7 @@ function renderCots() {
   const el = document.getElementById('cots-list');
   if(!list.length) { el.innerHTML = '<div class="empty"><div class="e-icon">📄</div><p>No hay cotizaciones aún.<br>Creá una con el botón ➕</p></div>'; return; }
   el.innerHTML = list.map(c => `
-    <div class="q-card" onclick="openDetail(${c.id})">
+    <div class="q-card" onclick="openDetail('${c.id}')">
       <div class="q-top">
         <span class="q-name">${escHtml(c.cliente)}</span>
         <span class="badge ${badgeClass(c.estado)}">${estadoLabel(c.estado)}</span>
@@ -1515,7 +1515,7 @@ function renderWorks() {
   const el = document.getElementById('works-list');
   if(!works.length) { el.innerHTML = '<div class="empty"><div class="e-icon">🔧</div><p>Los trabajos terminados aparecen aquí.<br>Marcá una cotización como "Realizado" para registrarla.</p></div>'; return; }
   el.innerHTML = works.map(c => `
-    <div class="q-card" onclick="openDetail(${c.id})">
+    <div class="q-card" onclick="openDetail('${c.id}')">
       <div class="q-top">
         <span class="q-name">${escHtml(c.cliente)}</span>
         <span class="badge b-real">Realizado</span>
@@ -1568,9 +1568,9 @@ function openDetail(id) {
       <label>Observaciones del trabajo</label>
       <textarea id="wd-obs" placeholder="Qué se hizo, repuestos usados, advertencias...">${c.workObs||''}</textarea>
     </div>
-    <button class="btn btn-full btn-green" onclick="saveWorkLog(${id})">💾 Guardar registro</button>
+    <button class="btn btn-full btn-green" onclick="saveWorkLog('${id}')">💾 Guardar registro</button>
     ${c.estado === 'realizado' ? `
-    <button class="btn btn-full" style="background:#25d366;color:#fff;margin-top:8px" onclick="reciboWhatsApp(${id})">📲 Enviar recibo por WhatsApp</button>
+    <button class="btn btn-full" style="background:#25d366;color:#fff;margin-top:8px" onclick="reciboWhatsApp('${id}')">📲 Enviar recibo por WhatsApp</button>
     ` : ''}
   ` : '';
 
@@ -1623,11 +1623,11 @@ function openDetail(id) {
     ${workSection}
 
     <div class="card mb14">
-      <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion(${id})">📄 Descargar cotización PDF</button>
-      <button class="btn btn-full" style="background:#7c3aed;color:#fff;margin-bottom:10px" onclick="duplicarCotizacion(${id})">📋 Duplicar cotización</button>
+      <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion('${id}')">📄 Descargar cotización PDF</button>
+      <button class="btn btn-full" style="background:#7c3aed;color:#fff;margin-bottom:10px" onclick="duplicarCotizacion('${id}')">📋 Duplicar cotización</button>
       <div class="row2" style="gap:10px">
-        <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion(${id})">✏️ Editar cotización</button>
-        <button class="btn btn-full btn-danger" onclick="deleteCotizacion(${id})">🗑️ Borrar</button>
+        <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion('${id}')">✏️ Editar cotización</button>
+        <button class="btn btn-full btn-danger" onclick="deleteCotizacion('${id}')">🗑️ Borrar</button>
       </div>
     </div>
 

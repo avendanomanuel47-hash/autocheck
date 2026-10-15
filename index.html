@@ -1376,7 +1376,7 @@ async function guardarCotizacion() {
 }
 
 function editCotizacion(id) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
   document.getElementById('detail-overlay').classList.remove('open');
   const btnNueva = document.querySelector(".nav-btn[onclick*=\"'nueva'\"]");
@@ -1420,7 +1420,7 @@ function cancelEdit() {
 }
 
 async function deleteCotizacion(id) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
   if(!confirm(`¿Borrar la cotización de ${c.cliente} (${c.vehiculo})? Esta acción no se puede deshacer.`)) return;
   db.cotizaciones = db.cotizaciones.filter(x => x.id !== id);
@@ -1535,7 +1535,7 @@ function renderWorks() {
 
 // ── DETAIL ──
 function openDetail(id) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
 
   // Safe id for onclick attributes — encode to avoid injection
@@ -1700,7 +1700,7 @@ function pdfBadge(estado) {
 }
 
 function pdfCotizacion(id) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
 
   const rows = c.items.map(i => `<tr>
@@ -1755,9 +1755,9 @@ function pdfCotizacion(id) {
     ${c.obs ? `<p style="font-size:12px;color:#555;margin-bottom:14px;line-height:1.5"><strong>Observaciones:</strong> ${escHtml(c.obs)}</p>` : ''}
     ${citaHtml}${workHtml}
     ${(() => {
-      const svcs = getMaintenanceStatus(placa);
+      const svcs = getMaintenanceStatus(c.placa);
       if(!svcs.length) return '';
-      const notes = (db.vehicleNotes||{})[placa] || {};
+      const notes = (db.vehicleNotes||{})[c.placa] || {};
       const rows = svcs.map(s => {
         const icon = s.status==='vencido' ? '🔴' : s.status==='proximo' ? '🟡' : '🟢';
         const msg = s.status==='vencido'
@@ -1944,7 +1944,7 @@ function exportarExcel() {
 
 // ── RECIBO WHATSAPP ──
 function reciboWhatsApp(id) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
 
   const nombre = c.cliente || '—';
@@ -2023,7 +2023,7 @@ function detectMaintType(items) {
 
 function getMaintRuleForPlaca(placa, maintType) {
   if(maintType === 'aceite') {
-    const notes = (db.vehicleNotes||{})[placa] || {};
+    const notes = (db.vehicleNotes||{})[c.placa] || {};
     const tipo = notes.tipoAceite || 'semisint';
     return MAINT_RULES['aceite_' + tipo];
   }
@@ -2074,7 +2074,7 @@ function getMaintenanceStatus(placa) {
 }
 
 function maintBadge(placa) {
-  const svcs = getMaintenanceStatus(placa);
+  const svcs = getMaintenanceStatus(c.placa);
   if(!svcs.length) return '';
   const worst = svcs.find(s=>s.status==='vencido') || svcs.find(s=>s.status==='proximo');
   if(!worst) return '';
@@ -2084,7 +2084,7 @@ function maintBadge(placa) {
 }
 
 function maintDetailPanel(placa) {
-  const svcs = getMaintenanceStatus(placa);
+  const svcs = getMaintenanceStatus(c.placa);
   if(!svcs.length) return `<div class="card mb14" style="border-left:3px solid var(--border)">
     <div class="section-label" style="margin-bottom:6px">🔧 próximos mantenimientos</div>
     <div style="font-size:12px;color:var(--text3)">Sin historial de mantenimiento registrado para esta placa.</div>
@@ -2244,7 +2244,7 @@ function closeDetail() {
 }
 
 async function setEstado(id, estado) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
   c.estado = estado;
   saveLocal();
@@ -2254,7 +2254,7 @@ async function setEstado(id, estado) {
 }
 
 async function saveWorkLog(id) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
   c.workFecha = document.getElementById('wd-fecha')?.value || '';
   // Ensure YYYY-MM-DD format before saving
@@ -3153,7 +3153,7 @@ function guardarCita(id, silent) {
 }
 
 function abrirGoogleCalendar(id) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return;
 
   const ok = guardarCita(id, true);

@@ -1611,10 +1611,10 @@ function openDetail(id) {
     <div class="card mb14">
       <div class="section-label" style="margin-bottom:10px">cambiar estado</div>
       <div class="status-row">
-        <button class="st-btn st-pend${c.estado==='pendiente'?' active':''}" onclick="setEstado(${id},'pendiente')">⏳ Pendiente</button>
-        <button class="st-btn st-apro${c.estado==='aprobada'?' active':''}" onclick="setEstado(${id},'aprobada')">✅ Aprobada</button>
-        <button class="st-btn st-real${c.estado==='realizado'?' active':''}" onclick="setEstado(${id},'realizado')">🔧 Realizado</button>
-        <button class="st-btn st-rech${c.estado==='rechazada'?' active':''}" onclick="setEstado(${id},'rechazada')">❌ Rechazada</button>
+        <button class="st-btn st-pend${c.estado==='pendiente'?' active':''}" onclick="setEstado('${id}','pendiente')">⏳ Pendiente</button>
+        <button class="st-btn st-apro${c.estado==='aprobada'?' active':''}" onclick="setEstado('${id}','aprobada')">✅ Aprobada</button>
+        <button class="st-btn st-real${c.estado==='realizado'?' active':''}" onclick="setEstado('${id}','realizado')">🔧 Realizado</button>
+        <button class="st-btn st-rech${c.estado==='rechazada'?' active':''}" onclick="setEstado('${id}','rechazada')">❌ Rechazada</button>
       </div>
     </div>
 
@@ -1762,15 +1762,18 @@ function pdfCotizacion(id) {
     <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
     </body></html>`;
 
-  const blob = new Blob([html], {type: 'text/html'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+  // Print via hidden iframe — works in installed PWA without popup permission
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => document.body.removeChild(iframe), 2000);
+  }, 600);
 }
 
 function pdfHistorialVehiculo(cliente, placa) {
@@ -1826,15 +1829,18 @@ function pdfHistorialVehiculo(cliente, placa) {
     <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
     </body></html>`;
 
-  const blob = new Blob([html], {type: 'text/html'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+  // Print via hidden iframe — works in installed PWA without popup permission
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => document.body.removeChild(iframe), 2000);
+  }, 600);
 }
 
 

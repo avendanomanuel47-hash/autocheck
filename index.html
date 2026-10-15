@@ -1537,6 +1537,10 @@ function renderWorks() {
 function openDetail(id) {
   const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
+
+  // Safe id for onclick attributes — encode to avoid injection
+  const safeId = String(id).replace(/'/g, "\\'");
+
   document.getElementById('detail-title').textContent = c.cliente;
   document.getElementById('detail-badge').className = 'badge ' + badgeClass(c.estado);
   document.getElementById('detail-badge').textContent = estadoLabel(c.estado);
@@ -1566,29 +1570,33 @@ function openDetail(id) {
     </div>
     <div class="mb10">
       <label>Observaciones del trabajo</label>
-      <textarea id="wd-obs" placeholder="Qué se hizo, repuestos usados, advertencias...">${c.workObs||''}</textarea>
+      <textarea id="wd-obs" placeholder="Qué se hizo, repuestos usados, advertencias...">${escHtml(c.workObs||'')}</textarea>
     </div>
-    <button class="btn btn-full btn-green" onclick="saveWorkLog('${id}')">💾 Guardar registro</button>
+    <button class="btn btn-full btn-green" onclick="saveWorkLog('${safeId}')">💾 Guardar registro</button>
     ${c.estado === 'realizado' ? `
-    <button class="btn btn-full" style="background:#25d366;color:#fff;margin-top:8px" onclick="reciboWhatsApp('${id}')">📲 Enviar recibo por WhatsApp</button>
+    <button class="btn btn-full" style="background:#25d366;color:#fff;margin-top:8px" onclick="reciboWhatsApp('${safeId}')">📲 Enviar recibo por WhatsApp</button>
     ` : ''}
   ` : '';
 
-  document.getElementById('detail-body').innerHTML = `
-    ${c.foto ? `<div class="card mb14" style="padding:0;overflow:hidden">
-      <img src="\${c.foto}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px">
-      <div style="padding:8px 12px;font-size:12px;color:var(--text3)">📷 Foto del diagnóstico</div>
-    </div>` : ''}
+  // Build HTML safely — avoid nested template literals with user data
+  let bodyHtml = '';
 
+  if (c.foto) {
+    bodyHtml += '<div class="card mb14" style="padding:0;overflow:hidden">' +
+      '<img src="' + escHtml(c.foto) + '" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px">' +
+      '<div style="padding:8px 12px;font-size:12px;color:var(--text3)">📷 Foto del diagnóstico</div></div>';
+  }
+
+  bodyHtml += `
     <div class="card mb14">
       <div class="section-label" style="margin-bottom:10px">datos del cliente</div>
       <div class="info-grid">
         <div class="info-item"><div class="key">Fecha cotización</div><div class="val">${fmtDate(c.fecha)}</div></div>
-        <div class="info-item"><div class="key">Teléfono</div><div class="val">${c.tel||'—'}</div></div>
-        <div class="info-item"><div class="key">Cédula</div><div class="val">${c.cedula||'—'}</div></div>
-        <div class="info-item"><div class="key">Vehículo</div><div class="val">${escHtml(c.vehiculo)}</div></div>
-        <div class="info-item"><div class="key">Placa</div><div class="val">${c.placa||'—'}</div></div>
-        <div class="info-item"><div class="key">Km entrada</div><div class="val">${c.km ? c.km+' km' : '—'}</div></div>
+        <div class="info-item"><div class="key">Teléfono</div><div class="val">${escHtml(c.tel||'—')}</div></div>
+        <div class="info-item"><div class="key">Cédula</div><div class="val">${escHtml(c.cedula||'—')}</div></div>
+        <div class="info-item"><div class="key">Vehículo</div><div class="val">${escHtml(c.vehiculo||'—')}</div></div>
+        <div class="info-item"><div class="key">Placa</div><div class="val">${escHtml(c.placa||'—')}</div></div>
+        <div class="info-item"><div class="key">Km entrada</div><div class="val">${c.km ? escHtml(String(c.km))+' km' : '—'}</div></div>
         <div class="info-item"><div class="key">Tipo</div><div class="val">${escHtml(c.tipo||'—')}</div></div>
       </div>
     </div>
@@ -1605,16 +1613,21 @@ function openDetail(id) {
         <span class="amt">₡${c.total.toLocaleString()}</span>
       </div>
     </div>
+  `;
 
-    ${c.obs ? `<div class="card mb14"><div class="section-label">observaciones</div><p style="font-size:13px;color:var(--text2);margin-top:6px">${escHtml(c.obs)}</p></div>` : ''}
+  if (c.obs) {
+    bodyHtml += '<div class="card mb14"><div class="section-label">observaciones</div>' +
+      '<p style="font-size:13px;color:var(--text2);margin-top:6px">' + escHtml(c.obs) + '</p></div>';
+  }
 
+  bodyHtml += `
     <div class="card mb14">
       <div class="section-label" style="margin-bottom:10px">cambiar estado</div>
       <div class="status-row">
-        <button class="st-btn st-pend${c.estado==='pendiente'?' active':''}" onclick="setEstado('${id}','pendiente')">⏳ Pendiente</button>
-        <button class="st-btn st-apro${c.estado==='aprobada'?' active':''}" onclick="setEstado('${id}','aprobada')">✅ Aprobada</button>
-        <button class="st-btn st-real${c.estado==='realizado'?' active':''}" onclick="setEstado('${id}','realizado')">🔧 Realizado</button>
-        <button class="st-btn st-rech${c.estado==='rechazada'?' active':''}" onclick="setEstado('${id}','rechazada')">❌ Rechazada</button>
+        <button class="st-btn st-pend${c.estado==='pendiente'?' active':''}" onclick="setEstado('${safeId}','pendiente')">⏳ Pendiente</button>
+        <button class="st-btn st-apro${c.estado==='aprobada'?' active':''}" onclick="setEstado('${safeId}','aprobada')">✅ Aprobada</button>
+        <button class="st-btn st-real${c.estado==='realizado'?' active':''}" onclick="setEstado('${safeId}','realizado')">🔧 Realizado</button>
+        <button class="st-btn st-rech${c.estado==='rechazada'?' active':''}" onclick="setEstado('${safeId}','rechazada')">❌ Rechazada</button>
       </div>
     </div>
 
@@ -1623,17 +1636,18 @@ function openDetail(id) {
     ${workSection}
 
     <div class="card mb14">
-      <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion('${id}')">📄 Descargar cotización PDF</button>
-      <button class="btn btn-full" style="background:#7c3aed;color:#fff;margin-bottom:10px" onclick="duplicarCotizacion('${id}')">📋 Duplicar cotización</button>
+      <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion('${safeId}')">📄 Descargar cotización PDF</button>
+      <button class="btn btn-full" style="background:#7c3aed;color:#fff;margin-bottom:10px" onclick="duplicarCotizacion('${safeId}')">📋 Duplicar cotización</button>
       <div class="row2" style="gap:10px">
-        <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion('${id}')">✏️ Editar cotización</button>
-        <button class="btn btn-full btn-danger" onclick="deleteCotizacion('${id}')">🗑️ Borrar</button>
+        <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion('${safeId}')">✏️ Editar cotización</button>
+        <button class="btn btn-full btn-danger" onclick="deleteCotizacion('${safeId}')">🗑️ Borrar</button>
       </div>
     </div>
 
     <div style="height:20px"></div>
   `;
 
+  document.getElementById('detail-body').innerHTML = bodyHtml;
   document.getElementById('detail-overlay').classList.add('open');
   document.getElementById('detail-overlay').scrollTop = 0;
 }

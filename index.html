@@ -1484,7 +1484,7 @@ function renderClients() {
   const el = document.getElementById('clients-list');
   if(!clients.length) { el.innerHTML = '<div class="empty"><div class="e-icon">👥</div><p>Los clientes aparecen aquí automáticamente cuando guardás cotizaciones.</p></div>'; return; }
   el.innerHTML = clients.map(c => `
-    <div class="client-card" onclick="openClientDetail('${escHtml(c.nombre)}')">
+    <div class="client-card" data-nombre="${escHtml(c.nombre)}" onclick="openClientDetail(this.dataset.nombre)">
       <div style="display:flex;gap:12px;align-items:center">
         <div class="avatar">${c.nombre.charAt(0).toUpperCase()}</div>
         <div style="flex:1">
@@ -2190,7 +2190,7 @@ function saveVehicleNotes() {
 
 // ── DUPLICAR COTIZACIÓN ──
 function duplicarCotizacion(id) {
-  const orig = db.cotizaciones.find(x => x.id === id);
+  const orig = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!orig) return;
   const nueva = JSON.parse(JSON.stringify(orig)); // deep copy
   nueva.id = Date.now();
@@ -2294,7 +2294,9 @@ function openClientDetail(nombre) {
     ${itvDetailPanel(cots[0]?.placa||'')}
     ${(()=>{ const ps=[...new Set(cots.map(c=>c.placa).filter(Boolean))]; return ps.map(pl=>maintDetailPanel(pl)).join(''); })()}
     ${vehiculos.length <= 1 ?
-      `<button class="btn btn-primary btn-full mb14" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(ultimoVehiculo)}','${escHtml(ultimaPlaca)}')">
+      `<button class="btn btn-primary btn-full mb14" 
+        data-n="${escHtml(nombre)}" data-t="${escHtml(tel)}" data-v="${escHtml(ultimoVehiculo)}" data-p="${escHtml(ultimaPlaca)}"
+        onclick="nuevaCotizacionPara(this.dataset.n,this.dataset.t,this.dataset.v,this.dataset.p)">
         ➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])}
       </button>` :
       `<div class="card mb14" style="border:1.5px solid var(--red)">

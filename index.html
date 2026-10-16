@@ -1027,7 +1027,7 @@ function updateF(id, field, val) {
 }
 
 function applyMargin(id, pct) {
-  const it = items.find(x => String(x.id) === String(id));
+  const it = items.find(x => x.id === id);
   if(!it || !it.cost) { toast('Ingresá el costo primero'); return; }
   const precio = Math.round(it.cost * (1 + pct/100));
   updateF(id, 'price', precio);
@@ -1042,7 +1042,7 @@ function applyMargin(id, pct) {
 }
 
 function updateItemDisplay(id) {
-  const it = items.find(x => String(x.id) === String(id));
+  const it = items.find(x => x.id === id);
   if(!it) return;
   const card = document.getElementById('item-card-' + id);
   if(!card) return;
@@ -1097,7 +1097,7 @@ function renderItems() {
             oninput="updateF(${it.id},'cost',+this.value||0);updateItemDisplay(${it.id});calcTotal()"
             style="font-size:13px">
           <div style="display:flex;gap:4px">
-            ${[10,20,30].map(p=>`<button class="margin-btn" data-pct="${p}" onclick="applyMargin('${it.id}',${p})"
+            ${[10,20,30].map(p=>`<button class="margin-btn" data-pct="${p}" onclick="applyMargin(${it.id},${p})"
               style="padding:4px 8px;font-size:11px;font-weight:700;border-radius:6px;border:1.5px solid ${margenPct===p?'#1d4ed8':'var(--border)'};background:${margenPct===p?'#1d4ed8':'var(--surface)'};color:${margenPct===p?'#fff':'var(--text)'};cursor:pointer">+${p}%</button>`).join('')}
           </div>
         </div>
@@ -1108,7 +1108,7 @@ function renderItems() {
     <div id="item-card-${it.id}" style="background:var(--surface2);border-radius:10px;padding:10px;margin-bottom:8px;border:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
         <span class="item-label ${it.type==='labor'?'lbl-labor':'lbl-part'}">${it.type==='labor'?'Mano de obra':'Repuesto'}</span>
-        <button class="rm-btn" onclick="removeItem('${it.id}')">×</button>
+        <button class="rm-btn" onclick="removeItem(${it.id})">×</button>
       </div>
       <input type="text" placeholder="${it.type==='labor'?'Descripción del trabajo':'Nombre del repuesto / marca'}" value="${escHtml(it.desc)}" oninput="updateF(${it.id},'desc',this.value)" style="margin-bottom:7px;font-size:14px">
       ${partExtra}
@@ -1376,7 +1376,7 @@ async function guardarCotizacion() {
 }
 
 function editCotizacion(id) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
   document.getElementById('detail-overlay').classList.remove('open');
   const btnNueva = document.querySelector(".nav-btn[onclick*=\"'nueva'\"]");
@@ -1420,7 +1420,7 @@ function cancelEdit() {
 }
 
 async function deleteCotizacion(id) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
   if(!confirm(`¿Borrar la cotización de ${c.cliente} (${c.vehiculo})? Esta acción no se puede deshacer.`)) return;
   db.cotizaciones = db.cotizaciones.filter(x => x.id !== id);
@@ -1460,7 +1460,7 @@ function renderCots() {
   const el = document.getElementById('cots-list');
   if(!list.length) { el.innerHTML = '<div class="empty"><div class="e-icon">📄</div><p>No hay cotizaciones aún.<br>Creá una con el botón ➕</p></div>'; return; }
   el.innerHTML = list.map(c => `
-    <div class="q-card" onclick="openDetail('${c.id}')">
+    <div class="q-card" onclick="openDetail(${c.id})">
       <div class="q-top">
         <span class="q-name">${escHtml(c.cliente)}</span>
         <span class="badge ${badgeClass(c.estado)}">${estadoLabel(c.estado)}</span>
@@ -1484,7 +1484,7 @@ function renderClients() {
   const el = document.getElementById('clients-list');
   if(!clients.length) { el.innerHTML = '<div class="empty"><div class="e-icon">👥</div><p>Los clientes aparecen aquí automáticamente cuando guardás cotizaciones.</p></div>'; return; }
   el.innerHTML = clients.map(c => `
-    <div class="client-card" data-nombre="${escHtml(c.nombre)}" onclick="openClientDetail(this.dataset.nombre)">
+    <div class="client-card" onclick="openClientDetail('${escHtml(c.nombre)}')">
       <div style="display:flex;gap:12px;align-items:center">
         <div class="avatar">${c.nombre.charAt(0).toUpperCase()}</div>
         <div style="flex:1">
@@ -1515,7 +1515,7 @@ function renderWorks() {
   const el = document.getElementById('works-list');
   if(!works.length) { el.innerHTML = '<div class="empty"><div class="e-icon">🔧</div><p>Los trabajos terminados aparecen aquí.<br>Marcá una cotización como "Realizado" para registrarla.</p></div>'; return; }
   el.innerHTML = works.map(c => `
-    <div class="q-card" onclick="openDetail('${c.id}')">
+    <div class="q-card" onclick="openDetail(${c.id})">
       <div class="q-top">
         <span class="q-name">${escHtml(c.cliente)}</span>
         <span class="badge b-real">Realizado</span>
@@ -1535,12 +1535,8 @@ function renderWorks() {
 
 // ── DETAIL ──
 function openDetail(id) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
-
-  // Safe id for onclick attributes — encode to avoid injection
-  const safeId = String(id).replace(/'/g, "\\'");
-
   document.getElementById('detail-title').textContent = c.cliente;
   document.getElementById('detail-badge').className = 'badge ' + badgeClass(c.estado);
   document.getElementById('detail-badge').textContent = estadoLabel(c.estado);
@@ -1570,33 +1566,29 @@ function openDetail(id) {
     </div>
     <div class="mb10">
       <label>Observaciones del trabajo</label>
-      <textarea id="wd-obs" placeholder="Qué se hizo, repuestos usados, advertencias...">${escHtml(c.workObs||'')}</textarea>
+      <textarea id="wd-obs" placeholder="Qué se hizo, repuestos usados, advertencias...">${c.workObs||''}</textarea>
     </div>
-    <button class="btn btn-full btn-green" onclick="saveWorkLog('${safeId}')">💾 Guardar registro</button>
+    <button class="btn btn-full btn-green" onclick="saveWorkLog(${id})">💾 Guardar registro</button>
     ${c.estado === 'realizado' ? `
-    <button class="btn btn-full" style="background:#25d366;color:#fff;margin-top:8px" onclick="reciboWhatsApp('${safeId}')">📲 Enviar recibo por WhatsApp</button>
+    <button class="btn btn-full" style="background:#25d366;color:#fff;margin-top:8px" onclick="reciboWhatsApp(${id})">📲 Enviar recibo por WhatsApp</button>
     ` : ''}
   ` : '';
 
-  // Build HTML safely — avoid nested template literals with user data
-  let bodyHtml = '';
+  document.getElementById('detail-body').innerHTML = `
+    ${c.foto ? `<div class="card mb14" style="padding:0;overflow:hidden">
+      <img src="\${c.foto}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px">
+      <div style="padding:8px 12px;font-size:12px;color:var(--text3)">📷 Foto del diagnóstico</div>
+    </div>` : ''}
 
-  if (c.foto) {
-    bodyHtml += '<div class="card mb14" style="padding:0;overflow:hidden">' +
-      '<img src="' + escHtml(c.foto) + '" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px">' +
-      '<div style="padding:8px 12px;font-size:12px;color:var(--text3)">📷 Foto del diagnóstico</div></div>';
-  }
-
-  bodyHtml += `
     <div class="card mb14">
       <div class="section-label" style="margin-bottom:10px">datos del cliente</div>
       <div class="info-grid">
         <div class="info-item"><div class="key">Fecha cotización</div><div class="val">${fmtDate(c.fecha)}</div></div>
-        <div class="info-item"><div class="key">Teléfono</div><div class="val">${escHtml(c.tel||'—')}</div></div>
-        <div class="info-item"><div class="key">Cédula</div><div class="val">${escHtml(c.cedula||'—')}</div></div>
-        <div class="info-item"><div class="key">Vehículo</div><div class="val">${escHtml(c.vehiculo||'—')}</div></div>
-        <div class="info-item"><div class="key">Placa</div><div class="val">${escHtml(c.placa||'—')}</div></div>
-        <div class="info-item"><div class="key">Km entrada</div><div class="val">${c.km ? escHtml(String(c.km))+' km' : '—'}</div></div>
+        <div class="info-item"><div class="key">Teléfono</div><div class="val">${c.tel||'—'}</div></div>
+        <div class="info-item"><div class="key">Cédula</div><div class="val">${c.cedula||'—'}</div></div>
+        <div class="info-item"><div class="key">Vehículo</div><div class="val">${escHtml(c.vehiculo)}</div></div>
+        <div class="info-item"><div class="key">Placa</div><div class="val">${c.placa||'—'}</div></div>
+        <div class="info-item"><div class="key">Km entrada</div><div class="val">${c.km ? c.km+' km' : '—'}</div></div>
         <div class="info-item"><div class="key">Tipo</div><div class="val">${escHtml(c.tipo||'—')}</div></div>
       </div>
     </div>
@@ -1613,21 +1605,16 @@ function openDetail(id) {
         <span class="amt">₡${c.total.toLocaleString()}</span>
       </div>
     </div>
-  `;
 
-  if (c.obs) {
-    bodyHtml += '<div class="card mb14"><div class="section-label">observaciones</div>' +
-      '<p style="font-size:13px;color:var(--text2);margin-top:6px">' + escHtml(c.obs) + '</p></div>';
-  }
+    ${c.obs ? `<div class="card mb14"><div class="section-label">observaciones</div><p style="font-size:13px;color:var(--text2);margin-top:6px">${escHtml(c.obs)}</p></div>` : ''}
 
-  bodyHtml += `
     <div class="card mb14">
       <div class="section-label" style="margin-bottom:10px">cambiar estado</div>
       <div class="status-row">
-        <button class="st-btn st-pend${c.estado==='pendiente'?' active':''}" onclick="setEstado('${safeId}','pendiente')">⏳ Pendiente</button>
-        <button class="st-btn st-apro${c.estado==='aprobada'?' active':''}" onclick="setEstado('${safeId}','aprobada')">✅ Aprobada</button>
-        <button class="st-btn st-real${c.estado==='realizado'?' active':''}" onclick="setEstado('${safeId}','realizado')">🔧 Realizado</button>
-        <button class="st-btn st-rech${c.estado==='rechazada'?' active':''}" onclick="setEstado('${safeId}','rechazada')">❌ Rechazada</button>
+        <button class="st-btn st-pend${c.estado==='pendiente'?' active':''}" onclick="setEstado(${id},'pendiente')">⏳ Pendiente</button>
+        <button class="st-btn st-apro${c.estado==='aprobada'?' active':''}" onclick="setEstado(${id},'aprobada')">✅ Aprobada</button>
+        <button class="st-btn st-real${c.estado==='realizado'?' active':''}" onclick="setEstado(${id},'realizado')">🔧 Realizado</button>
+        <button class="st-btn st-rech${c.estado==='rechazada'?' active':''}" onclick="setEstado(${id},'rechazada')">❌ Rechazada</button>
       </div>
     </div>
 
@@ -1636,18 +1623,17 @@ function openDetail(id) {
     ${workSection}
 
     <div class="card mb14">
-      <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion('${safeId}')">📄 Descargar cotización PDF</button>
-      <button class="btn btn-full" style="background:#7c3aed;color:#fff;margin-bottom:10px" onclick="duplicarCotizacion('${safeId}')">📋 Duplicar cotización</button>
+      <button class="btn btn-full" style="background:#1d4ed8;color:#fff;margin-bottom:10px" onclick="pdfCotizacion(${id})">📄 Descargar cotización PDF</button>
+      <button class="btn btn-full" style="background:#7c3aed;color:#fff;margin-bottom:10px" onclick="duplicarCotizacion(${id})">📋 Duplicar cotización</button>
       <div class="row2" style="gap:10px">
-        <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion('${safeId}')">✏️ Editar cotización</button>
-        <button class="btn btn-full btn-danger" onclick="deleteCotizacion('${safeId}')">🗑️ Borrar</button>
+        <button class="btn btn-full" style="background:var(--surface2);color:var(--text)" onclick="editCotizacion(${id})">✏️ Editar cotización</button>
+        <button class="btn btn-full btn-danger" onclick="deleteCotizacion(${id})">🗑️ Borrar</button>
       </div>
     </div>
 
     <div style="height:20px"></div>
   `;
 
-  document.getElementById('detail-body').innerHTML = bodyHtml;
   document.getElementById('detail-overlay').classList.add('open');
   document.getElementById('detail-overlay').scrollTop = 0;
 }
@@ -1700,7 +1686,7 @@ function pdfBadge(estado) {
 }
 
 function pdfCotizacion(id) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
 
   const rows = c.items.map(i => `<tr>
@@ -1755,9 +1741,9 @@ function pdfCotizacion(id) {
     ${c.obs ? `<p style="font-size:12px;color:#555;margin-bottom:14px;line-height:1.5"><strong>Observaciones:</strong> ${escHtml(c.obs)}</p>` : ''}
     ${citaHtml}${workHtml}
     ${(() => {
-      const svcs = getMaintenanceStatus(c.placa);
+      const svcs = getMaintenanceStatus(placa);
       if(!svcs.length) return '';
-      const notes = (db.vehicleNotes||{})[c.placa] || {};
+      const notes = (db.vehicleNotes||{})[placa] || {};
       const rows = svcs.map(s => {
         const icon = s.status==='vencido' ? '🔴' : s.status==='proximo' ? '🟡' : '🟢';
         const msg = s.status==='vencido'
@@ -1776,18 +1762,11 @@ function pdfCotizacion(id) {
     <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
     </body></html>`;
 
-  // Print via hidden iframe — works in installed PWA without popup permission
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
-  document.body.appendChild(iframe);
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(html);
-  iframe.contentDocument.close();
-  setTimeout(() => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-    setTimeout(() => document.body.removeChild(iframe), 2000);
-  }, 600);
+  const w = window.open('', '_blank');
+  if(!w) { toast('Permitir popups para generar PDF'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
 }
 
 function pdfHistorialVehiculo(cliente, placa) {
@@ -1843,18 +1822,11 @@ function pdfHistorialVehiculo(cliente, placa) {
     <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
     </body></html>`;
 
-  // Print via hidden iframe — works in installed PWA without popup permission
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
-  document.body.appendChild(iframe);
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(html);
-  iframe.contentDocument.close();
-  setTimeout(() => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-    setTimeout(() => document.body.removeChild(iframe), 2000);
-  }, 600);
+  const w = window.open('', '_blank');
+  if(!w) { toast('Permitir popups para generar PDF'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
 }
 
 
@@ -1944,7 +1916,7 @@ function exportarExcel() {
 
 // ── RECIBO WHATSAPP ──
 function reciboWhatsApp(id) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
 
   const nombre = c.cliente || '—';
@@ -2023,7 +1995,7 @@ function detectMaintType(items) {
 
 function getMaintRuleForPlaca(placa, maintType) {
   if(maintType === 'aceite') {
-    const notes = (db.vehicleNotes||{})[c.placa] || {};
+    const notes = (db.vehicleNotes||{})[placa] || {};
     const tipo = notes.tipoAceite || 'semisint';
     return MAINT_RULES['aceite_' + tipo];
   }
@@ -2074,7 +2046,7 @@ function getMaintenanceStatus(placa) {
 }
 
 function maintBadge(placa) {
-  const svcs = getMaintenanceStatus(c.placa);
+  const svcs = getMaintenanceStatus(placa);
   if(!svcs.length) return '';
   const worst = svcs.find(s=>s.status==='vencido') || svcs.find(s=>s.status==='proximo');
   if(!worst) return '';
@@ -2084,7 +2056,7 @@ function maintBadge(placa) {
 }
 
 function maintDetailPanel(placa) {
-  const svcs = getMaintenanceStatus(c.placa);
+  const svcs = getMaintenanceStatus(placa);
   if(!svcs.length) return `<div class="card mb14" style="border-left:3px solid var(--border)">
     <div class="section-label" style="margin-bottom:6px">🔧 próximos mantenimientos</div>
     <div style="font-size:12px;color:var(--text3)">Sin historial de mantenimiento registrado para esta placa.</div>
@@ -2190,7 +2162,7 @@ function saveVehicleNotes() {
 
 // ── DUPLICAR COTIZACIÓN ──
 function duplicarCotizacion(id) {
-  const orig = db.cotizaciones.find(x => String(x.id) === String(id));
+  const orig = db.cotizaciones.find(x => x.id === id);
   if(!orig) return;
   const nueva = JSON.parse(JSON.stringify(orig)); // deep copy
   nueva.id = Date.now();
@@ -2244,7 +2216,7 @@ function closeDetail() {
 }
 
 async function setEstado(id, estado) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
   c.estado = estado;
   saveLocal();
@@ -2254,7 +2226,7 @@ async function setEstado(id, estado) {
 }
 
 async function saveWorkLog(id) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
   c.workFecha = document.getElementById('wd-fecha')?.value || '';
   // Ensure YYYY-MM-DD format before saving
@@ -2294,9 +2266,7 @@ function openClientDetail(nombre) {
     ${itvDetailPanel(cots[0]?.placa||'')}
     ${(()=>{ const ps=[...new Set(cots.map(c=>c.placa).filter(Boolean))]; return ps.map(pl=>maintDetailPanel(pl)).join(''); })()}
     ${vehiculos.length <= 1 ?
-      `<button class="btn btn-primary btn-full mb14" 
-        data-n="${escHtml(nombre)}" data-t="${escHtml(tel)}" data-v="${escHtml(ultimoVehiculo)}" data-p="${escHtml(ultimaPlaca)}"
-        onclick="nuevaCotizacionPara(this.dataset.n,this.dataset.t,this.dataset.v,this.dataset.p)">
+      `<button class="btn btn-primary btn-full mb14" onclick="nuevaCotizacionPara('${escHtml(nombre)}','${escHtml(tel)}','${escHtml(ultimoVehiculo)}','${escHtml(ultimaPlaca)}')">
         ➕ Nueva cotización para ${escHtml(nombre.split(' ')[0])}
       </button>` :
       `<div class="card mb14" style="border:1.5px solid var(--red)">
@@ -2341,7 +2311,7 @@ function openClientDetail(nombre) {
 
     <div class="section-label">historial de trabajos (${cots.length})</div>
     ${cots.map(c => `
-      <div class="q-card" onclick="document.getElementById('client-overlay').classList.remove('open');openDetail('${c.id}')">
+      <div class="q-card" onclick="document.getElementById('client-overlay').classList.remove('open');openDetail(${c.id})">
         <div class="q-top">
           <span>${fmtDate(c.fecha)}</span>
           <span class="badge ${badgeClass(c.estado)}">${estadoLabel(c.estado)}</span>
@@ -3092,8 +3062,8 @@ function buildCitaPanel(c) {
       </div>
 
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-sm" style="flex:1;justify-content:center" onclick="guardarCita('${c.id}')">💾 Guardar cita</button>
-        <button class="btn btn-sm" style="flex:1;justify-content:center;background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="abrirGoogleCalendar('${c.id}')">🗓 Crear en Google Calendar</button>
+        <button class="btn btn-sm" style="flex:1;justify-content:center" onclick="guardarCita(${c.id})">💾 Guardar cita</button>
+        <button class="btn btn-sm" style="flex:1;justify-content:center;background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="abrirGoogleCalendar(${c.id})">🗓 Crear en Google Calendar</button>
       </div>
 
       ${c.citaFecha && c.citaHora ? `
@@ -3131,7 +3101,7 @@ function fmtFechaLarga(fechaStr) {
 }
 
 function guardarCita(id, silent) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return false;
 
   const fecha = document.getElementById('cita-fecha-'+id)?.value || '';
@@ -3155,7 +3125,7 @@ function guardarCita(id, silent) {
 }
 
 function abrirGoogleCalendar(id) {
-  const c = db.cotizaciones.find(x => String(x.id) === String(id));
+  const c = db.cotizaciones.find(x => x.id === id);
   if(!c) return;
 
   const ok = guardarCita(id, true);
@@ -3378,7 +3348,7 @@ function openCatalogForm(id) {
   initCatalog();
   catEditId = id || null;
   const modal = document.getElementById('catalog-modal');
-  const item = id ? db.catalog.find(x => String(x.id) === String(id)) : null;
+  const item = id ? db.catalog.find(x => x.id === id) : null;
 
   document.getElementById('catalog-modal-title').textContent = item ? 'Editar ítem' : 'Nuevo ítem';
   document.getElementById('cat-edit-id').value = id || '';

@@ -1027,7 +1027,7 @@ function updateF(id, field, val) {
 }
 
 function applyMargin(id, pct) {
-  const it = items.find(x => x.id === id);
+  const it = items.find(x => String(x.id) === String(id));
   if(!it || !it.cost) { toast('Ingresá el costo primero'); return; }
   const precio = Math.round(it.cost * (1 + pct/100));
   updateF(id, 'price', precio);
@@ -1042,7 +1042,7 @@ function applyMargin(id, pct) {
 }
 
 function updateItemDisplay(id) {
-  const it = items.find(x => x.id === id);
+  const it = items.find(x => String(x.id) === String(id));
   if(!it) return;
   const card = document.getElementById('item-card-' + id);
   if(!card) return;
@@ -1097,7 +1097,7 @@ function renderItems() {
             oninput="updateF(${it.id},'cost',+this.value||0);updateItemDisplay(${it.id});calcTotal()"
             style="font-size:13px">
           <div style="display:flex;gap:4px">
-            ${[10,20,30].map(p=>`<button class="margin-btn" data-pct="${p}" onclick="applyMargin(${it.id},${p})"
+            ${[10,20,30].map(p=>`<button class="margin-btn" data-pct="${p}" onclick="applyMargin('${it.id}',${p})"
               style="padding:4px 8px;font-size:11px;font-weight:700;border-radius:6px;border:1.5px solid ${margenPct===p?'#1d4ed8':'var(--border)'};background:${margenPct===p?'#1d4ed8':'var(--surface)'};color:${margenPct===p?'#fff':'var(--text)'};cursor:pointer">+${p}%</button>`).join('')}
           </div>
         </div>
@@ -2341,7 +2341,7 @@ function openClientDetail(nombre) {
 
     <div class="section-label">historial de trabajos (${cots.length})</div>
     ${cots.map(c => `
-      <div class="q-card" onclick="document.getElementById('client-overlay').classList.remove('open');openDetail(${c.id})">
+      <div class="q-card" onclick="document.getElementById('client-overlay').classList.remove('open');openDetail('${c.id}')">
         <div class="q-top">
           <span>${fmtDate(c.fecha)}</span>
           <span class="badge ${badgeClass(c.estado)}">${estadoLabel(c.estado)}</span>
@@ -3092,8 +3092,8 @@ function buildCitaPanel(c) {
       </div>
 
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-sm" style="flex:1;justify-content:center" onclick="guardarCita(${c.id})">💾 Guardar cita</button>
-        <button class="btn btn-sm" style="flex:1;justify-content:center;background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="abrirGoogleCalendar(${c.id})">🗓 Crear en Google Calendar</button>
+        <button class="btn btn-sm" style="flex:1;justify-content:center" onclick="guardarCita('${c.id}')">💾 Guardar cita</button>
+        <button class="btn btn-sm" style="flex:1;justify-content:center;background:#1a73e8;color:#fff;border-color:#1a73e8" onclick="abrirGoogleCalendar('${c.id}')">🗓 Crear en Google Calendar</button>
       </div>
 
       ${c.citaFecha && c.citaHora ? `
@@ -3131,7 +3131,7 @@ function fmtFechaLarga(fechaStr) {
 }
 
 function guardarCita(id, silent) {
-  const c = db.cotizaciones.find(x => x.id === id);
+  const c = db.cotizaciones.find(x => String(x.id) === String(id));
   if(!c) return false;
 
   const fecha = document.getElementById('cita-fecha-'+id)?.value || '';
@@ -3378,7 +3378,7 @@ function openCatalogForm(id) {
   initCatalog();
   catEditId = id || null;
   const modal = document.getElementById('catalog-modal');
-  const item = id ? db.catalog.find(x => x.id === id) : null;
+  const item = id ? db.catalog.find(x => String(x.id) === String(id)) : null;
 
   document.getElementById('catalog-modal-title').textContent = item ? 'Editar ítem' : 'Nuevo ítem';
   document.getElementById('cat-edit-id').value = id || '';

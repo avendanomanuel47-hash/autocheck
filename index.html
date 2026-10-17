@@ -571,9 +571,9 @@ body.dark .avatar { background: #e53e3e; }
         <div id="leg-clientes" style="display:flex;gap:14px;justify-content:center;margin-top:10px"></div>
       </div>
 
-      <div class="card mb14" id="utilidad-metrics-card">
-        <div class="section-label" style="margin-bottom:12px">💰 facturación vs utilidad</div>
-        <div id="utilidad-metrics"></div>
+      <div class="card mb14" id="ticket-trend-card">
+        <div class="section-label" style="margin-bottom:12px">📈 ticket promedio & tendencia mensual</div>
+        <div id="ticket-trend"></div>
       </div>
 
       <div class="card mb14">
@@ -1988,14 +1988,21 @@ const MAINT_RULES = {
 function detectMaintType(items) {
   const descs = (items||[]).map(i => (i.desc||'').toLowerCase()).join(' ');
   const results = [];
-  // Engine oil — broad match
-  if(/aceite|filtro.*motor|motor.*filtro|oil|cambio.*aceite|aceite.*cambio/.test(descs)) {
+  // Engine oil — specific match (avoid "aceite de frenos", "aceite dirección", etc.)
+  if(/aceite\s*(de\s*)?(motor|engin|sintet|semisint|mineral)|filtro\s*(de\s*)?aceite|filtro\s*(de\s*)?motor|motor\s*(.*\s*)?filtro|cambio\s*(de\s*)?aceite|aceite\s*(.*\s*)?cambio|engine\s*oil|motor\s*oil/.test(descs)) {
     results.push('aceite');
   }
-  // Transmission
-  if(/cvt/.test(descs)) results.push('trans_cvt');
-  else if(/transmisi[oó]n.*autom[aá]tica|autom[aá]tica.*transmisi[oó]n|atf/.test(descs)) results.push('trans_automatica');
-  else if(/transmisi[oó]n.*manual|manual.*transmisi[oó]n/.test(descs)) results.push('trans_manual');
+  // Transmission — must imply an actual fluid change, not just inspection/diagnosis
+  // CVT: explicit mention of CVT fluid/oil change
+  if(/cvt\s*(fluid|oil|aceite|fluido)|aceite\s*(cvt|de\s*cvt)|cambio\s*(de\s*)?(aceite\s*)?cvt|cvt.*cambio/.test(descs)) {
+    results.push('trans_cvt');
+  // Automatic: ATF change or "aceite transmisión automática"
+  } else if(/\batf\b|aceite\s*(de\s*)?transmisi[oó]n\s*autom[aá]tica|cambio\s*(de\s*)?(aceite\s*)?transmisi[oó]n\s*autom[aá]tica|transmisi[oó]n\s*autom[aá]tica\s*(aceite|fluido|cambio)/.test(descs)) {
+    results.push('trans_automatica');
+  // Manual: explicit oil change for manual transmission
+  } else if(/aceite\s*(de\s*)?transmisi[oó]n\s*manual|cambio\s*(de\s*)?(aceite\s*)?transmisi[oó]n\s*manual|transmisi[oó]n\s*manual\s*(aceite|cambio)/.test(descs)) {
+    results.push('trans_manual');
+  }
   return results;
 }
 
@@ -2756,70 +2763,82 @@ function renderMetrics() {
   renderTopList('top-labor', laborMap, '#e53e3e');
   renderTopList('top-parts', partsMap, '#2563eb');
 
-  // ── Utilidad breakdown card ──
-  const utilCard = document.getElementById('utilidad-metrics-card');
-  const utilEl   = document.getElementById('utilidad-metrics');
-  if(!utilEl) return;
+  // ── Ticket promedio & tendencia mensual ──
+  const ticketCard = document.getElementById('ticket-trend-card');
+  const ticketEl   = document.getElementById('ticket-trend');
+  if(!ticketEl) return;
 
-  if(!hayCostos) {
-    utilCard.style.display = 'none';
-  } else {
-    utilCard.style.display = 'block';
-    const costoTotal = costoRep;
-    const margenStr  = margenPct !== null ? margenPct + '%' : '—';
-    const barFact    = 100;
-    const barUtil    = totalIngr > 0 ? Math.round(utilidad/totalIngr*100) : 0;
-    const barCosto   = totalIngr > 0 ? Math.round(costoTotal/totalIngr*100) : 0;
+  // Agrupar realizados por mes (últimos 6 meses como máximo)
+  const byMonth = {};
+  realizados.forEach(c => {
+    const d = new Date(c.fecha);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if(!byMonth[key]) byMonth[key] = { total: 0, count: 0, mo: 0, rep: 0 };
+    byMonth[key].total += c.total || 0;
+    byMonth[key].count += 1;
+    byMonth[key].mo  += (c.items||[]).filter(i=>i.type==='labor').reduce((a,i)=>a+(i.qty||1)*(i.price||0),0);
+    byMonth[key].rep += (c.items||[]).filter(i=>i.type==='part').reduce((a,i)=>a+(i.qty||1)*(i.price||0),0);
+  });
 
-    utilEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Facturación</div>
-          <div style="font-size:16px;font-weight:800;color:#059669">₡${totalIngr.toLocaleString()}</div>
-        </div>
-        <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Utilidad neta</div>
-          <div style="font-size:16px;font-weight:800;color:#10b981">₡${utilidad.toLocaleString()}</div>
-        </div>
-        <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Costo repuestos</div>
-          <div style="font-size:16px;font-weight:800;color:#e53e3e">₡${costoTotal.toLocaleString()}</div>
-        </div>
-        <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Margen global</div>
-          <div style="font-size:16px;font-weight:800;color:#7c3aed">${margenStr}</div>
-        </div>
-      </div>
+  const meses = Object.keys(byMonth).sort().slice(-6);
+  const ticketProm = realizados.length > 0 ? Math.round(totalIngr / realizados.length) : 0;
 
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-          <span>Mano de obra</span><span style="font-weight:700;color:#e53e3e">₡${ingrMO.toLocaleString()}</span>
-        </div>
-        <div style="background:var(--surface2);border-radius:4px;height:8px;overflow:hidden">
-          <div style="width:${totalIngr>0?Math.round(ingrMO/totalIngr*100):0}%;height:100%;background:#e53e3e;border-radius:4px"></div>
-        </div>
-      </div>
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-          <span>Venta repuestos</span><span style="font-weight:700;color:#2563eb">₡${ingrRep.toLocaleString()}</span>
-        </div>
-        <div style="background:var(--surface2);border-radius:4px;height:8px;overflow:hidden">
-          <div style="width:${totalIngr>0?Math.round(ingrRep/totalIngr*100):0}%;height:100%;background:#2563eb;border-radius:4px"></div>
-        </div>
-      </div>
-      <div style="margin-bottom:4px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-          <span>Ganancia repuestos</span><span style="font-weight:700;color:#10b981">₡${ganRep.toLocaleString()}</span>
-        </div>
-        <div style="background:var(--surface2);border-radius:4px;height:8px;overflow:hidden">
-          <div style="width:${totalIngr>0?Math.round(ganRep/totalIngr*100):0}%;height:100%;background:#10b981;border-radius:4px"></div>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        Solo incluye trabajos con costo de repuestos registrado
-      </div>
-    `;
+  if(!meses.length) {
+    ticketCard.style.display = 'none';
+    return;
   }
+  ticketCard.style.display = 'block';
+
+  // Ticket promedio global vs mes anterior
+  const mesActual  = meses[meses.length - 1];
+  const mesAnterior = meses[meses.length - 2];
+  const ticketMesAct = byMonth[mesActual].count > 0 ? Math.round(byMonth[mesActual].total / byMonth[mesActual].count) : 0;
+  const ticketMesAnt = mesAnterior && byMonth[mesAnterior].count > 0 ? Math.round(byMonth[mesAnterior].total / byMonth[mesAnterior].count) : null;
+  const deltaPct = ticketMesAnt ? Math.round((ticketMesAct - ticketMesAnt) / ticketMesAnt * 100) : null;
+  const deltaStr = deltaPct !== null ? (deltaPct >= 0 ? `▲ ${deltaPct}%` : `▼ ${Math.abs(deltaPct)}%`) : '';
+  const deltaColor = deltaPct > 0 ? '#059669' : deltaPct < 0 ? '#e53e3e' : '#888';
+
+  const maxTotal = Math.max(...meses.map(m => byMonth[m].total), 1);
+
+  const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+  const barRows = meses.map(m => {
+    const [y, mo] = m.split('-');
+    const label = MONTH_NAMES[parseInt(mo)-1] + ' ' + y.slice(2);
+    const d = byMonth[m];
+    const ticket = d.count > 0 ? Math.round(d.total / d.count) : 0;
+    const barW = Math.round(d.total / maxTotal * 100);
+    const isCurrent = m === mesActual;
+    return `
+      <div style="margin-bottom:9px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:3px">
+          <span style="font-weight:${isCurrent?'700':'400'};color:${isCurrent?'var(--text1)':'var(--text2)'}">${label}</span>
+          <span style="color:var(--text2)">
+            <span style="font-weight:700;color:#2563eb">₡${d.total.toLocaleString()}</span>
+            &nbsp;·&nbsp; ${d.count} trabajo${d.count!==1?'s':''}
+            &nbsp;·&nbsp; ticket ₡${ticket.toLocaleString()}
+          </span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:7px;overflow:hidden">
+          <div style="width:${barW}%;height:100%;background:${isCurrent?'#2563eb':'#93c5fd'};border-radius:4px;transition:width 0.4s"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  ticketEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Ticket promedio (período)</div>
+        <div style="font-size:18px;font-weight:800;color:#2563eb">₡${ticketProm.toLocaleString()}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Ticket este mes</div>
+        <div style="font-size:18px;font-weight:800;color:#2563eb">₡${ticketMesAct.toLocaleString()}</div>
+        ${deltaStr ? `<div style="font-size:11px;font-weight:700;color:${deltaColor};margin-top:2px">${deltaStr} vs mes ant.</div>` : ''}
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Facturación mensual (últimos ${meses.length} meses)</div>
+    ${barRows}
+  `;
 }
 
 function drawDona(canvasId, legendId, data, prefix) {

@@ -1165,6 +1165,7 @@ function genWA() {
   const v = gv('q-vehiculo') || '—';
   const p = gv('q-placa') || '—';
   const k = gv('q-km') || '—';
+  const kunit = (document.getElementById('q-kmunit')?.value) || 'km';
   const t = gv('q-tipo') || '—';
   const obs = gv('q-obs');
   const total = items.reduce((s,i) => s+(i.qty||1)*(i.price||0), 0);
@@ -1179,7 +1180,7 @@ function genWA() {
 
 👤 *Cliente:* ${c}
 🚗 *Vehículo:* ${v}  |  Placa: ${p}
-📍 *Km:* ${k}
+📍 *${kunit==='mi'?'Millaje':'Km'}:* ${k==='—' ? k : k+' '+kunit}
 
 *🛠 Trabajo:* ${t}
 
@@ -1958,7 +1959,7 @@ function reciboWhatsApp(id) {
     `✅ *Trabajo completado — ${nombre}*%0A` +
     `🚗 ${vehiculo} | ${placa}%0A` +
     `📅 Fecha: ${fecha}%0A` +
-    `🛣️ Km salida: ${kmSalida}` +
+    `🛣️ ${c.kmunit==='mi'?'Millaje':'Km'} salida: ${kmSalida}` +
     `${obsWork}%0A` +
     `%0A*Detalle de servicios:*%0A` +
     lineas +

@@ -1588,7 +1588,7 @@ function openDetail(id) {
         <div class="info-item"><div class="key">Cédula</div><div class="val">${c.cedula||'—'}</div></div>
         <div class="info-item"><div class="key">Vehículo</div><div class="val">${escHtml(c.vehiculo)}</div></div>
         <div class="info-item"><div class="key">Placa</div><div class="val">${c.placa||'—'}</div></div>
-        <div class="info-item"><div class="key">Km entrada</div><div class="val">${c.km ? c.km+' km' : '—'}</div></div>
+        <div class="info-item"><div class="key">${c.kmunit==='mi'?'Millaje entrada':'Km entrada'}</div><div class="val">${c.km ? c.km+' '+(c.kmunit||'km') : '—'}</div></div>
         <div class="info-item"><div class="key">Tipo</div><div class="val">${escHtml(c.tipo||'—')}</div></div>
       </div>
     </div>
@@ -1800,7 +1800,7 @@ function pdfHistorialVehiculo(cliente, placa) {
         <strong style="font-size:14px">${fmtDate(c.fecha)}</strong>
         ${pdfBadge(c.estado)}
       </div>
-      ${c.km ? `<div class="kv" style="margin-bottom:6px"><span class="k">Km entrada:</span><span class="v">${c.km} km</span></div>` : ''}
+      ${c.km ? `<div class="kv" style="margin-bottom:6px"><span class="k">${c.kmunit==='mi'?'Millaje entrada:':'Km entrada:'}</span><span class="v">${c.km} ${c.kmunit||'km'}</span></div>` : ''}
       ${c.tipo ? `<div class="kv" style="margin-bottom:6px"><span class="k">Tipo:</span><span class="v">${escHtml(c.tipo)}</span></div>` : ''}
       <table>
         <thead><tr><th>Tipo</th><th>Descripcion</th><th style="text-align:center">Cant.</th><th style="text-align:right">Total</th></tr></thead>
@@ -3176,7 +3176,7 @@ function abrirGoogleCalendar(id) {
     'Cliente: ' + c.cliente + '\n' +
     'Teléfono: ' + (c.tel||'—') + '\n' +
     'Vehículo: ' + c.vehiculo + ' | Placa: ' + (c.placa||'—') + '\n' +
-    'Kilometraje: ' + (c.km||'—') + '\n' +
+    (c.kmunit==='mi'?'Millaje':'Kilometraje') + ': ' + (c.km ? c.km+' '+(c.kmunit||'km') : '—') + '\n' +
     'Trabajo: ' + (c.tipo||'—') + '\n' +
     'Total cotizado: ₡' + c.total.toLocaleString() + '\n\n' +
     'Generado desde Avendaño AutoCheck'

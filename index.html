@@ -1524,7 +1524,7 @@ function renderWorks() {
         <span>🚗 ${escHtml(c.vehiculo)}</span>
         <span>📋 ${c.placa||'—'}</span>
         ${c.workFecha ? `<span>📅 ${fmtDate(c.workFecha)}</span>` : ''}
-        ${c.workKm ? `<span>📍 ${parseInt(c.workKm).toLocaleString()} km</span>` : ''}
+        ${c.workKm ? `<span>📍 ${parseInt(c.workKm).toLocaleString()} ${c.kmunit||'km'}</span>` : ''}
       </div>
       <div class="q-tipo">${escHtml(c.tipo||'—')}</div>
       <div class="q-total">₡${c.total.toLocaleString()}</div>
@@ -1560,8 +1560,8 @@ function openDetail(id) {
         <input type="date" id="wd-fecha" value="${toDateInput(c.workFecha)}">
       </div>
       <div>
-        <label>Km al entregar</label>
-        <input type="number" id="wd-km" placeholder="Km" value="${c.workKm||''}">
+        <label>${c.kmunit==='mi' ? 'Millaje al entregar' : 'Km al entregar'}</label>
+        <input type="number" id="wd-km" placeholder="${c.kmunit==='mi' ? 'mi' : 'km'}" value="${c.workKm||''}">
       </div>
     </div>
     <div class="mb10">
@@ -1701,7 +1701,7 @@ function pdfCotizacion(id) {
     <h2>Registro de Trabajo</h2>
     <div class="grid2">
       ${c.workFecha ? `<div class="kv"><span class="k">Fecha entrega:</span><span class="v">${fmtDate(c.workFecha)}</span></div>` : ''}
-      ${c.workKm ? `<div class="kv"><span class="k">Km al entregar:</span><span class="v">${c.workKm} km</span></div>` : ''}
+      ${c.workKm ? `<div class="kv"><span class="k">${c.kmunit==='mi'?'Millaje al entregar:':'Km al entregar:'}</span><span class="v">${c.workKm} ${c.kmunit||'km'}</span></div>` : ''}
     </div>
     ${c.workObs ? `<p style="font-size:12px;color:#333;margin-bottom:12px;line-height:1.5">${escHtml(c.workObs)}</p>` : ''}
   ` : '';
@@ -1749,7 +1749,8 @@ function pdfCotizacion(id) {
         const msg = s.status==='vencido'
           ? 'Vencido hace ' + Math.abs(s.daysLeft) + ' dias'
           : 'Proximo en ' + s.daysLeft + ' dias';
-        return '<tr><td>' + icon + ' ' + s.label + '</td><td>' + fmtDate(s.nextDate.toISOString()) + '</td><td>' + msg + (s.nextKm ? ' · ' + s.nextKm.toLocaleString() + ' km' : '') + '</td></tr>';
+        const kmDisp = s.nextKm ? ' · ' + (s.kmunit==='mi' ? Math.round(s.nextKm/1.60934).toLocaleString()+' mi' : s.nextKm.toLocaleString()+' km') : '';
+        return '<tr><td>' + icon + ' ' + s.label + '</td><td>' + fmtDate(s.nextDate.toISOString()) + '</td><td>' + msg + kmDisp + '</td></tr>';
       }).join('');
       let notasHtml = '';
       if(notes.viscosidad) notasHtml += '<p style="font-size:12px;margin:4px 0"><strong>Aceite:</strong> ' + notes.viscosidad.toUpperCase() + ' · ' + (notes.tipoAceite==='sintetico'?'Sintético':notes.tipoAceite==='mineral'?'Mineral':'Semisintético') + (notes.marcaAceite?' · '+notes.marcaAceite:'') + '</p>';
@@ -1928,7 +1929,7 @@ function reciboWhatsApp(id) {
   const nombre = c.cliente || '—';
   const vehiculo = c.vehiculo || '—';
   const placa = c.placa || '—';
-  const kmSalida = c.workKm ? c.workKm + ' km' : '—';
+  const kmSalida = c.workKm ? c.workKm + ' ' + (c.kmunit||'km') : '—';
   const fecha = c.workFecha ? fmtDate(c.workFecha) : fmtDate(c.fecha);
 
   const laborItems = (c.items||[]).filter(i => i.type === 'labor');
@@ -2051,7 +2052,8 @@ function getMaintenanceStatus(placa) {
         type: t, label: svc.rule.label,
         nextDate: svc.nextDate, nextKm: svc.nextKm,
         daysLeft, status,
-        lastDate: c.workFecha, lastKm: c.workKm
+        lastDate: c.workFecha, lastKm: c.workKm,
+        kmunit: c.kmunit || 'km'
       });
     }
   }
@@ -2086,7 +2088,7 @@ function maintDetailPanel(placa) {
         <span style="font-size:13px;font-weight:600">${icon} ${s.label}</span>
         <span style="font-size:11px;color:var(--text3)">${fmtDate(s.nextDate.toISOString())}</span>
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">${msg}${s.nextKm ? ' · Próx.: '+s.nextKm.toLocaleString()+' km' : ''}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${msg}${s.nextKm ? ' · Próx.: '+(s.kmunit==='mi' ? Math.round(s.nextKm/1.60934).toLocaleString()+' mi' : s.nextKm.toLocaleString()+' km') : ''}</div>
     </div>`;
   }).join('');
   return `<div class="card mb14">
@@ -2332,7 +2334,7 @@ function openClientDetail(nombre) {
         <div style="font-size:14px;font-weight:600;margin:3px 0">${escHtml(c.tipo||'—')}</div>
         <div style="font-size:13px;color:var(--text2)">₡${c.total.toLocaleString()} · ${escHtml(c.vehiculo||'—')}</div>
         ${c.workFecha?`<div style="font-size:12px;color:var(--text3);margin-top:2px">✅ Entregado: ${fmtDate(c.workFecha)}</div>`:''}
-        ${c.workKm?`<div style="font-size:12px;color:var(--text3)">📍 ${parseInt(c.workKm).toLocaleString()} km</div>`:''}
+        ${c.workKm?`<div style="font-size:12px;color:var(--text3)">📍 ${parseInt(c.workKm).toLocaleString()} ${c.kmunit||'km'}</div>`:''}
         ${c.workObs?`<div style="font-size:12px;color:var(--text2);background:var(--surface2);padding:6px 9px;border-radius:6px;margin-top:6px">${escHtml(c.workObs)}</div>`:''}
       </div>
     `).join('')}

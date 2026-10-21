@@ -2054,7 +2054,7 @@ function getMaintenanceStatus(placa) {
         nextDate: svc.nextDate, nextKm: svc.nextKm,
         daysLeft, status,
         lastDate: c.workFecha, lastKm: c.workKm,
-        kmunit: c.kmunit || 'km'
+        kmunit: (db.vehicleNotes||{})[placa]?.kmunit || c.kmunit || 'km'
       });
     }
   }
@@ -2119,11 +2119,13 @@ function renderVehicleNoteCards(cots) {
   vehicles.forEach(function(v) {
     var notes = (db.vehicleNotes||{})[v.placa] || {};
     var tipoLabel = notes.tipoAceite==='sintetico'?'Sintético':notes.tipoAceite==='mineral'?'Mineral':'Semisintético';
+    var unitLabel = notes.kmunit === 'mi' ? ' · 🗺️ millas' : '';
     var info = '';
-    if(notes.viscosidad) info += '<div style="font-size:12px;color:var(--text2)">🛢 '+escHtml(notes.viscosidad.toUpperCase())+' · '+tipoLabel+(notes.marcaAceite?' · '+escHtml(notes.marcaAceite):'')+' </div>';
+    if(notes.viscosidad) info += '<div style="font-size:12px;color:var(--text2)">🛢 '+escHtml(notes.viscosidad.toUpperCase())+' · '+tipoLabel+(notes.marcaAceite?' · '+escHtml(notes.marcaAceite):'')+unitLabel+'</div>';
+    else if(notes.kmunit) info += '<div style="font-size:12px;color:var(--text2)">🗺️ '+escHtml(notes.kmunit==='mi'?'Millas':'Kilómetros')+'</div>';
     if(notes.marcaFiltro) info += '<div style="font-size:12px;color:var(--text2);margin-top:2px">🔩 Filtro: '+escHtml(notes.marcaFiltro)+'</div>';
     if(notes.obs) info += '<div style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic">'+escHtml(notes.obs)+'</div>';
-    if(!notes.viscosidad&&!notes.obs&&!notes.marcaFiltro) info += '<div style="font-size:12px;color:var(--text3)">Sin notas — tocá ⚙️ para agregar</div>';
+    if(!notes.viscosidad&&!notes.obs&&!notes.marcaFiltro&&!notes.kmunit) info += '<div style="font-size:12px;color:var(--text3)">Sin notas — tocá ⚙️ para agregar</div>';
 
     out += '<div class="card mb14">'
          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
@@ -2145,6 +2147,35 @@ function renderVehicleNoteCards(cots) {
   });
 }
 
+function vnSetUnit(unit) {
+  document.getElementById('vn-kmunit').value = unit;
+  const kmBtn = document.getElementById('vn-unit-km');
+  const miBtn = document.getElementById('vn-unit-mi');
+  if(unit === 'mi') {
+    kmBtn.style.cssText = 'padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer';
+    miBtn.style.cssText = 'padding:10px;border-radius:8px;border:2px solid #2563eb;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer';
+  } else {
+    kmBtn.style.cssText = 'padding:10px;border-radius:8px;border:2px solid #2563eb;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer';
+    miBtn.style.cssText = 'padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer';
+  }
+  vnUpdateOilLabels();
+}
+
+function vnUpdateOilLabels() {
+  const unit = document.getElementById('vn-kmunit')?.value || 'km';
+  const sel = document.getElementById('vn-tipoAceite');
+  if(!sel) return;
+  if(unit === 'mi') {
+    sel.options[0].text = 'Semisintético (5,000 mi / 6 meses)';
+    sel.options[1].text = 'Sintético (6,200 mi / 12 meses)';
+    sel.options[2].text = 'Mineral (3,100 mi / 3 meses)';
+  } else {
+    sel.options[0].text = 'Semisintético (8,000 km / 6 meses)';
+    sel.options[1].text = 'Sintético (10,000 km / 12 meses)';
+    sel.options[2].text = 'Mineral (5,000 km / 3 meses)';
+  }
+}
+
 function openVehicleNotes(placa, vehiculo) {
   if(!db.vehicleNotes) db.vehicleNotes = {};
   var notes = db.vehicleNotes[placa] || {};
@@ -2157,6 +2188,8 @@ function openVehicleNotes(placa, vehiculo) {
   document.getElementById('vn-marcaAceite').value = notes.marcaAceite||'';
   document.getElementById('vn-marcaFiltro').value = notes.marcaFiltro||'';
   document.getElementById('vn-obs').value = notes.obs||'';
+  // Restore km unit
+  vnSetUnit(notes.kmunit || 'km');
   overlay.classList.add('open');
 }
 
@@ -2169,6 +2202,7 @@ function saveVehicleNotes() {
     marcaAceite: document.getElementById('vn-marcaAceite').value,
     marcaFiltro: document.getElementById('vn-marcaFiltro').value,
     obs:         document.getElementById('vn-obs').value,
+    kmunit:      document.getElementById('vn-kmunit').value || 'km',
   };
   saveLocal();
   document.getElementById('vnotes-overlay').classList.remove('open');
@@ -3757,6 +3791,21 @@ if (!yaInstalada) {
     <input type="hidden" id="vn-placa">
 
     <div class="card mb14">
+      <div class="section-label" style="margin-bottom:12px">🚗 unidad de distancia</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+        <button id="vn-unit-km" onclick="vnSetUnit('km')"
+          style="padding:10px;border-radius:8px;border:2px solid #2563eb;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer">
+          km (kilómetros)
+        </button>
+        <button id="vn-unit-mi" onclick="vnSetUnit('mi')"
+          style="padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer">
+          mi (millas)
+        </button>
+      </div>
+      <input type="hidden" id="vn-kmunit" value="km">
+    </div>
+
+    <div class="card mb14">
       <div class="section-label" style="margin-bottom:12px">🛢 aceite de motor</div>
 
       <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Viscosidad</label>
@@ -3771,7 +3820,7 @@ if (!yaInstalada) {
       </select>
 
       <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Tipo de aceite</label>
-      <select id="vn-tipoAceite" style="margin-bottom:12px;font-size:14px;width:100%">
+      <select id="vn-tipoAceite" onchange="vnUpdateOilLabels()" style="margin-bottom:12px;font-size:14px;width:100%">
         <option value="semisint">Semisintético (8,000 km / 6 meses)</option>
         <option value="sintetico">Sintético (10,000 km / 12 meses)</option>
         <option value="mineral">Mineral (5,000 km / 3 meses)</option>

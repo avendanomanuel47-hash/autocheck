@@ -1750,7 +1750,7 @@ function pdfCotizacion(id) {
         const msg = s.status==='vencido'
           ? 'Vencido hace ' + Math.abs(s.daysLeft) + ' dias'
           : 'Proximo en ' + s.daysLeft + ' dias';
-        const kmDisp = s.nextKm ? ' · ' + (s.kmunit==='mi' ? Math.round(s.nextKm/1.60934).toLocaleString()+' mi' : s.nextKm.toLocaleString()+' km') : '';
+        const kmDisp = s.nextKm ? ' · ' + s.nextKm.toLocaleString() + ' ' + s.kmunit : '';
         return '<tr><td>' + icon + ' ' + s.label + '</td><td>' + fmtDate(s.nextDate.toISOString()) + '</td><td>' + msg + kmDisp + '</td></tr>';
       }).join('');
       let notasHtml = '';
@@ -2023,15 +2023,26 @@ function calcNextService(fechaRealizado, kmRealizado, placa, maintType) {
   const base = new Date(fechaRealizado);
   const nextDate = new Date(base);
   nextDate.setMonth(nextDate.getMonth() + rule.months);
-  const nextKm = kmRealizado ? Number(kmRealizado) + rule.km : null;
+  // kmRealizado is always in the vehicle's native unit (km or mi).
+  // rule.km is in km — convert to the vehicle's unit before adding.
+  const unit = getKmUnit(placa);
+  const intervalInUnit = unit === 'mi' ? Math.round(rule.km / 1.60934) : rule.km;
+  const nextKm = kmRealizado ? Number(kmRealizado) + intervalInUnit : null;
   return { nextDate, nextKm, rule };
 }
 
 // Always prefer vehicle profile unit over per-quote unit
-function getKmUnit(c) {
-  if(!c) return 'km';
-  const placa = c.placa;
-  return (placa && (db.vehicleNotes||{})[placa]?.kmunit) || c.kmunit || 'km';
+// Pass a cotizacion object, or a placa string directly
+function getKmUnit(cOrPlaca) {
+  if(!cOrPlaca) return 'km';
+  const isStr = typeof cOrPlaca === 'string';
+  const placa = isStr ? cOrPlaca : (cOrPlaca.placa ? String(cOrPlaca.placa) : null);
+  const vn = (db.vehicleNotes||{});
+  // Try exact key, then trimmed, then case-insensitive
+  const notes = placa ? (vn[placa] || vn[placa.trim()] || vn[Object.keys(vn).find(k=>k.trim().toLowerCase()===placa.trim().toLowerCase())||'']) : null;
+  if(notes?.kmunit) return notes.kmunit;
+  if(isStr) return 'km';
+  return cOrPlaca.kmunit || 'km';
 }
 
 function getMaintenanceStatus(placa) {
@@ -2048,7 +2059,8 @@ function getMaintenanceStatus(placa) {
       if(seen.has(t)) continue;
       seen.add(t);
       const rawKm = c.workKm || c.km;
-      const kmNorm = rawKm ? (getKmUnit(c)==='mi' ? Math.round(Number(rawKm)*1.60934) : Number(rawKm)) : null;
+      // rawKm is already in the vehicle's native unit — no conversion needed
+      const kmNorm = rawKm ? Number(rawKm) : null;
       const svc = calcNextService(c.workFecha || c.fecha, kmNorm, placa, t);
       if(!svc) continue;
       const now = new Date();
@@ -2096,7 +2108,7 @@ function maintDetailPanel(placa) {
         <span style="font-size:13px;font-weight:600">${icon} ${s.label}</span>
         <span style="font-size:11px;color:var(--text3)">${fmtDate(s.nextDate.toISOString())}</span>
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">${msg}${s.nextKm ? ' · Próx.: '+(s.kmunit==='mi' ? Math.round(s.nextKm/1.60934).toLocaleString()+' mi' : s.nextKm.toLocaleString()+' km') : ''}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${msg}${s.nextKm ? ' · Próx.: '+s.nextKm.toLocaleString()+' '+s.kmunit : ''}</div>
     </div>`;
   }).join('');
   return `<div class="card mb14">

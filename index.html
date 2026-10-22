@@ -799,7 +799,15 @@ async function syncNow() {
   try {
     const data = await jsonp(scriptUrl + '?action=getAll&token=' + encodeURIComponent(APP_TOKEN));
     if(data && data.cotizaciones) {
+      // Preserve local-only fields that the server never stores
+      const savedVehicleNotes = db.vehicleNotes || {};
+      const savedCatalog = db.catalog;
       db.cotizaciones = data.cotizaciones;
+      // Restore local-only fields after overwrite
+      if(!db.vehicleNotes || Object.keys(db.vehicleNotes).length === 0) {
+        db.vehicleNotes = savedVehicleNotes;
+      }
+      if(savedCatalog) db.catalog = savedCatalog;
       // Reaplicar cambios locales aún no subidos para no perderlos al traer datos del servidor
       getQueue().forEach(item => {
         if(item.type === 'delete') {
@@ -1982,7 +1990,7 @@ function reciboWhatsApp(id) {
 
 
 // ── VEHICLE NOTES & MAINTENANCE ──
-const APP_VER = 'v26';
+const APP_VER = 'v27';
 console.log('[AutoCheck]', APP_VER, 'loaded');
 
 const MAINT_RULES = {
@@ -2035,7 +2043,7 @@ function calcNextService(fechaRealizado, kmRealizado, placa, maintType) {
   const unit = getKmUnit(placa);
   const intervalInUnit = unit === 'mi' ? Math.round(rule.km / 1.60934) : rule.km;
   const nextKm = kmRealizado ? Number(kmRealizado) + intervalInUnit : null;
-  console.log('[maint]', APP_VER, 'placa:', placa, 'unit:', unit, 'kmRealizado:', kmRealizado, 'rule.km:', rule.km, 'intervalInUnit:', intervalInUnit, 'nextKm:', nextKm);
+  console.log('[maint]', APP_VER, 'placa:', placa, 'unit:', unit, 'vn_keys:', Object.keys(db.vehicleNotes||{}), 'vn_placa:', (db.vehicleNotes||{})[placa], 'kmRealizado:', kmRealizado, 'intervalInUnit:', intervalInUnit, 'nextKm:', nextKm);
   return { nextDate, nextKm, rule };
 }
 
@@ -2231,7 +2239,13 @@ function saveVehicleNotes() {
     obs:         document.getElementById('vn-obs').value,
     kmunit:      document.getElementById('vn-kmunit').value || 'km',
   };
+  console.log('[vnotes] saved placa:', placa, db.vehicleNotes[placa]);
   saveLocal();
+  // Verify it was actually saved
+  try {
+    const check = JSON.parse(localStorage.getItem('autocheck_v2') || '{}');
+    console.log('[vnotes] verify localStorage kmunit:', check?.vehicleNotes?.[placa]?.kmunit);
+  } catch(e) {}
   document.getElementById('vnotes-overlay').classList.remove('open');
   toast('✅ Notas del vehículo guardadas');
 }

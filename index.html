@@ -319,7 +319,7 @@ body.dark .avatar { background: #e53e3e; }
       <p>Sistema de gestión</p>
     </div>
     <div class="header-right" style="display:flex;align-items:center;gap:6px">
-      <span id="app-ver-badge" style="font-size:10px;color:var(--text3);opacity:0.7"></span>
+      <span id="app-ver-badge" onclick="forceUpdate()" style="font-size:10px;color:var(--text3);opacity:0.7;cursor:pointer" title="Toca para actualizar"></span>
       <button class="dark-toggle" onclick="openInstallHelp()" id="install-trigger" title="Instalar app" style="display:none">📲</button>
       <button class="dark-toggle" onclick="toggleDark()" id="dark-toggle" title="Tema oscuro">🌙</button>
       <button class="sync-btn" onclick="syncNow()" id="sync-btn">
@@ -1982,7 +1982,7 @@ function reciboWhatsApp(id) {
 
 
 // ── VEHICLE NOTES & MAINTENANCE ──
-const APP_VER = 'v24';
+const APP_VER = 'v26';
 console.log('[AutoCheck]', APP_VER, 'loaded');
 
 const MAINT_RULES = {
@@ -3602,6 +3602,21 @@ function addItemFromCatalog(catId) {
 
 
 // ── DARK MODE ──
+async function forceUpdate() {
+  if(!confirm('¿Borrar caché y actualizar la app a la última versión?')) return;
+  try {
+    // Unregister all service workers
+    if('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for(const reg of regs) await reg.unregister();
+    }
+    // Delete all caches
+    const keys = await caches.keys();
+    for(const k of keys) await caches.delete(k);
+  } catch(e) { console.warn('forceUpdate error:', e); }
+  window.location.reload(true);
+}
+
 function toggleDark() {
   const isDark = document.body.classList.toggle('dark');
   localStorage.setItem('autocheck_dark', isDark ? '1' : '0');

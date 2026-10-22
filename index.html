@@ -673,8 +673,16 @@ function init() {
     const saved = localStorage.getItem('autocheck_v2');
     if(saved) db = JSON.parse(saved);
   } catch(e){}
-  // Ensure new fields exist in old dbs
+  // vehicleNotes stored in a separate key — merge and prefer it over db copy
+  try {
+    const vn = localStorage.getItem('autocheck_vnotes');
+    if(vn) {
+      const parsed = JSON.parse(vn);
+      db.vehicleNotes = Object.assign({}, db.vehicleNotes||{}, parsed);
+    }
+  } catch(e){}
   if(!db.vehicleNotes) db.vehicleNotes = {};
+  console.log('[init] v27 vehicleNotes keys:', Object.keys(db.vehicleNotes));
 
   // Auto-set cloud config if not already set
   if(!localStorage.getItem('autocheck_script')) {
@@ -751,6 +759,12 @@ function refreshVisibleTab() {
   if(id === 'tab-cots') { updateStats(); renderCots(); }
   else if(id === 'tab-clients') { renderClients(); }
   else if(id === 'tab-metrics') { renderMetrics(); }
+  // If a client detail panel is open, re-render it so maintenance badges update
+  const clientOverlay = document.getElementById('client-overlay');
+  if(clientOverlay && clientOverlay.classList.contains('open')) {
+    const title = document.getElementById('client-detail-title');
+    if(title && title.textContent) openClientDetail(title.textContent);
+  }
 }
 
 // ── SYNC ──
@@ -803,10 +817,11 @@ async function syncNow() {
       const savedVehicleNotes = db.vehicleNotes || {};
       const savedCatalog = db.catalog;
       db.cotizaciones = data.cotizaciones;
-      // Restore local-only fields after overwrite
-      if(!db.vehicleNotes || Object.keys(db.vehicleNotes).length === 0) {
-        db.vehicleNotes = savedVehicleNotes;
-      }
+      // Always restore vehicleNotes from separate localStorage key (never from server)
+      try {
+        const vn = localStorage.getItem('autocheck_vnotes');
+        db.vehicleNotes = vn ? Object.assign({}, savedVehicleNotes, JSON.parse(vn)) : savedVehicleNotes;
+      } catch(e) { db.vehicleNotes = savedVehicleNotes; }
       if(savedCatalog) db.catalog = savedCatalog;
       // Reaplicar cambios locales aún no subidos para no perderlos al traer datos del servidor
       getQueue().forEach(item => {
@@ -928,6 +943,8 @@ window.addEventListener('online', () => { toast('📶 Conexión recuperada, sinc
 
 function saveLocal() {
   try { localStorage.setItem('autocheck_v2', JSON.stringify(db)); } catch(e){}
+  // vehicleNotes in a separate key so sync never overwrites it
+  try { localStorage.setItem('autocheck_vnotes', JSON.stringify(db.vehicleNotes||{})); } catch(e){}
 }
 
 function setLoading(on) {
@@ -1990,7 +2007,7 @@ function reciboWhatsApp(id) {
 
 
 // ── VEHICLE NOTES & MAINTENANCE ──
-const APP_VER = 'v27';
+const APP_VER = 'v28';
 console.log('[AutoCheck]', APP_VER, 'loaded');
 
 const MAINT_RULES = {
@@ -3617,14 +3634,14 @@ function addItemFromCatalog(catId) {
 
 // ── DARK MODE ──
 async function forceUpdate() {
-  if(!confirm('¿Borrar caché y actualizar la app a la última versión?')) return;
+  if(!confirm('¿Actualizar la app a la última versión?\n(Los datos guardados no se borran)')) return;
   try {
-    // Unregister all service workers
+    // Unregister all service workers so the browser fetches fresh files
     if('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
       for(const reg of regs) await reg.unregister();
     }
-    // Delete all caches
+    // Delete only SW caches — NOT localStorage (that holds vehicleNotes, catalog, etc.)
     const keys = await caches.keys();
     for(const k of keys) await caches.delete(k);
   } catch(e) { console.warn('forceUpdate error:', e); }

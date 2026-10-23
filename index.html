@@ -2007,7 +2007,7 @@ function reciboWhatsApp(id) {
 
 
 // ── VEHICLE NOTES & MAINTENANCE ──
-const APP_VER = 'v28';
+const APP_VER = 'v29';
 console.log('[AutoCheck]', APP_VER, 'loaded');
 
 const MAINT_RULES = {
@@ -2084,31 +2084,31 @@ function getMaintenanceStatus(placa) {
     .filter(c => c.placa === placa && c.estado === 'realizado')
     .sort((a,b) => new Date(b.workFecha||b.fecha) - new Date(a.workFecha||a.fecha));
 
+  // For each maintenance type, find the MOST RECENT cotización that contains it.
+  // We must not mix km from one cotización with the type detected in another.
+  const ALL_TYPES = ['aceite', 'trans_cvt', 'trans_automatica', 'trans_manual'];
   const results = [];
-  const seen = new Set();
-  for(const c of cots) {
-    const types = detectMaintType(c.items);
-    for(const t of types) {
-      if(seen.has(t)) continue;
-      seen.add(t);
-      const rawKm = c.workKm || c.km;
-      // rawKm is already in the vehicle's native unit — no conversion needed
-      const kmNorm = rawKm ? Number(rawKm) : null;
-      const svc = calcNextService(c.workFecha || c.fecha, kmNorm, placa, t);
-      if(!svc) continue;
-      const now = new Date();
-      const daysLeft = Math.round((svc.nextDate - now) / 86400000);
-      let status = 'ok';
-      if(daysLeft < 0) status = 'vencido';
-      else if(daysLeft <= 30) status = 'proximo';
-      results.push({
-        type: t, label: svc.rule.label,
-        nextDate: svc.nextDate, nextKm: svc.nextKm,
-        daysLeft, status,
-        lastDate: c.workFecha, lastKm: c.workKm,
-        kmunit: getKmUnit(c)
-      });
-    }
+
+  for(const t of ALL_TYPES) {
+    // Find the most recent cotización that includes this maintenance type
+    const c = cots.find(c => detectMaintType(c.items).includes(t));
+    if(!c) continue;
+    const rawKm = c.workKm || c.km;
+    const kmNorm = rawKm ? Number(rawKm) : null;
+    const svc = calcNextService(c.workFecha || c.fecha, kmNorm, placa, t);
+    if(!svc) continue;
+    const now = new Date();
+    const daysLeft = Math.round((svc.nextDate - now) / 86400000);
+    let status = 'ok';
+    if(daysLeft < 0) status = 'vencido';
+    else if(daysLeft <= 30) status = 'proximo';
+    results.push({
+      type: t, label: svc.rule.label,
+      nextDate: svc.nextDate, nextKm: svc.nextKm,
+      daysLeft, status,
+      lastDate: c.workFecha, lastKm: c.workKm,
+      kmunit: getKmUnit(c)
+    });
   }
   return results;
 }

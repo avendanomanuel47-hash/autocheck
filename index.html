@@ -2007,7 +2007,7 @@ function reciboWhatsApp(id) {
 
 
 // ── VEHICLE NOTES & MAINTENANCE ──
-const APP_VER = 'v29';
+const APP_VER = 'v30';
 console.log('[AutoCheck]', APP_VER, 'loaded');
 
 const MAINT_RULES = {
@@ -2020,23 +2020,29 @@ const MAINT_RULES = {
 };
 
 function detectMaintType(items) {
-  const descs = (items||[]).map(i => (i.desc||'').toLowerCase()).join(' ');
   const results = [];
-  // Engine oil — specific match (avoid "aceite de frenos", "aceite dirección", etc.)
-  if(/aceite\s*(de\s*)?(motor|engin|sintet|semisint|mineral)|filtro\s*(de\s*)?aceite|filtro\s*(de\s*)?motor|motor\s*(.*\s*)?filtro|cambio\s*(de\s*)?aceite|aceite\s*(.*\s*)?cambio|engine\s*oil|motor\s*oil/.test(descs)) {
-    results.push('aceite');
-  }
-  // Transmission — must imply an actual fluid change, not just inspection/diagnosis
-  // CVT: explicit mention of CVT fluid/oil change
+  const descs = (items||[]).map(i => (i.desc||'').toLowerCase()).join(' ');
+
+  // Check transmission types FIRST so we can exclude those items from engine-oil detection
   if(/cvt\s*(fluid|oil|aceite|fluido)|aceite\s*(cvt|de\s*cvt)|cambio\s*(de\s*)?(aceite\s*)?cvt|cvt.*cambio/.test(descs)) {
     results.push('trans_cvt');
-  // Automatic: ATF change or "aceite transmisión automática"
   } else if(/\batf\b|aceite\s*(de\s*)?transmisi[oó]n\s*autom[aá]tica|cambio\s*(de\s*)?(aceite\s*)?transmisi[oó]n\s*autom[aá]tica|transmisi[oó]n\s*autom[aá]tica\s*(aceite|fluido|cambio)/.test(descs)) {
     results.push('trans_automatica');
-  // Manual: explicit oil change for manual transmission
   } else if(/aceite\s*(de\s*)?transmisi[oó]n\s*manual|cambio\s*(de\s*)?(aceite\s*)?transmisi[oó]n\s*manual|transmisi[oó]n\s*manual\s*(aceite|cambio)/.test(descs)) {
     results.push('trans_manual');
   }
+
+  // Engine oil — only check items that are NOT transmission-related
+  // Filter out items that triggered transmission detection before checking for engine oil
+  const engineItems = (items||[]).filter(i => {
+    const d = (i.desc||'').toLowerCase();
+    return !/\batf\b|cvt|transmisi[oó]n/.test(d);
+  });
+  const engineDescs = engineItems.map(i => (i.desc||'').toLowerCase()).join(' ');
+  if(/aceite\s*(de\s*)?(motor|engin|sintet|semisint|mineral)|filtro\s*(de\s*)?aceite|filtro\s*(de\s*)?motor|motor\s*(.*\s*)?filtro|cambio\s*(de\s*)?aceite|aceite\s*(.*\s*)?cambio|engine\s*oil|motor\s*oil/.test(engineDescs)) {
+    results.push('aceite');
+  }
+
   return results;
 }
 

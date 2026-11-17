@@ -542,6 +542,9 @@ body.dark .avatar { background: #e53e3e; }
       <!-- KPI grid -->
       <div id="kpi-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
 
+      <!-- Metas mensuales -->
+      <div id="metas-box" style="margin-bottom:16px"></div>
+
       <!-- Desglose financiero -->
       <div id="fin-box" style="display:none;margin-bottom:16px"></div>
 
@@ -682,7 +685,7 @@ function init() {
     }
   } catch(e){}
   if(!db.vehicleNotes) db.vehicleNotes = {};
-  console.log('[init] v27 vehicleNotes keys:', Object.keys(db.vehicleNotes));
+  // vehicleNotes loaded
 
   // Auto-set cloud config if not already set
   if(!localStorage.getItem('autocheck_script')) {
@@ -1790,7 +1793,8 @@ function pdfCotizacion(id) {
         + '<table><thead><tr><th>Servicio</th><th>Fecha limite</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table>'
         + (notasHtml ? '<div style="background:#f8faff;border-radius:8px;padding:10px;margin-bottom:12px"><strong style="font-size:12px">Especificaciones del vehiculo:</strong>' + notasHtml + '</div>' : '');
     })()}
-    <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
+    <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica<br>
+    <span style="font-size:10px">💳 SINPE Móvil: 6040-4237 &nbsp;|&nbsp; 🏦 Transferencia: CR60 0151 1922 0010 1632 30</span></div>
     </body></html>`;
 
   const iframe = document.createElement('iframe');
@@ -1856,7 +1860,8 @@ function pdfHistorialVehiculo(cliente, placa) {
       <div class="kv" style="grid-column:1/-1"><span class="k">Total invertido:</span><span class="v" style="color:#1d4ed8;font-size:14px">&#8353;${totalGastado.toLocaleString()}</span></div>
     </div>
     ${cotBlocks}
-    <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica</div>
+    <div class="footer">Avendano AutoCheck &middot; Inspeccion vehicular a domicilio &middot; Costa Rica<br>
+    <span style="font-size:10px">💳 SINPE Móvil: 6040-4237 &nbsp;|&nbsp; 🏦 Transferencia: CR60 0151 1922 0010 1632 30</span></div>
     </body></html>`;
 
   const w = window.open('', '_blank');
@@ -1993,6 +1998,8 @@ function reciboWhatsApp(id) {
     `%0A*Detalle de servicios:*%0A` +
     lineas +
     `%0A💰 *Total cobrado: ₡${total.toLocaleString()}*%0A` +
+    `%0A💳 *Pago SINPE Móvil:* 6040-4237 (Manuel Avendaño)%0A` +
+    `🏦 *Transferencia:* CR60 0151 1922 0010 1632 30%0A` +
     `%0A¡Gracias por confiar en Avendaño AutoCheck! 🔧%0A` +
     `📞 6040-4237%0A` +
     `%0A⭐ *Tu opinión nos importa*, tomá 2 minutos:%0A` +
@@ -2007,8 +2014,7 @@ function reciboWhatsApp(id) {
 
 
 // ── VEHICLE NOTES & MAINTENANCE ──
-const APP_VER = 'v30';
-console.log('[AutoCheck]', APP_VER, 'loaded');
+const APP_VER = 'v32';
 
 const MAINT_RULES = {
   aceite_sintetico:   { km: 10000, months: 12, label: 'Aceite sintético' },
@@ -2026,17 +2032,21 @@ function detectMaintType(items) {
   // Check transmission types FIRST so we can exclude those items from engine-oil detection
   if(/cvt\s*(fluid|oil|aceite|fluido)|aceite\s*(cvt|de\s*cvt)|cambio\s*(de\s*)?(aceite\s*)?cvt|cvt.*cambio/.test(descs)) {
     results.push('trans_cvt');
-  } else if(/\batf\b|aceite\s*(de\s*)?transmisi[oó]n\s*autom[aá]tica|cambio\s*(de\s*)?(aceite\s*)?transmisi[oó]n\s*autom[aá]tica|transmisi[oó]n\s*autom[aá]tica\s*(aceite|fluido|cambio)/.test(descs)) {
+  } else if(/\batf\b|aceite\s*(de\s*)?tra[ns]+misi[oó]n\s*autom[aá]tica|cambio\s*(de\s*)?(aceite\s*)?tra[ns]+misi[oó]n\s*autom[aá]tica|tra[ns]+misi[oó]n\s*autom[aá]tica\s*(aceite|fluido|cambio)/.test(descs)) {
     results.push('trans_automatica');
-  } else if(/aceite\s*(de\s*)?transmisi[oó]n\s*manual|cambio\s*(de\s*)?(aceite\s*)?transmisi[oó]n\s*manual|transmisi[oó]n\s*manual\s*(aceite|cambio)/.test(descs)) {
+  } else if(/aceite\s*(de\s*)?tra[ns]+misi[oó]n\s*manual|cambio\s*(de\s*)?(aceite\s*)?tra[ns]+misi[oó]n\s*manual|tra[ns]+misi[oó]n\s*manual\s*(aceite|cambio)/.test(descs)) {
     results.push('trans_manual');
+  } else if(/cambio\s*(de\s*)?aceite\s*(de\s*)?tra[ns]+misi[oó]n|aceite\s*(de\s*)?tra[ns]+misi[oó]n|tra[ns]+misi[oó]n\s*(aceite|fluido|cambio)/.test(descs)) {
+    // Generic transmission oil change — default to automatic when not specified
+    results.push('trans_automatica');
   }
 
   // Engine oil — only check items that are NOT transmission-related
   // Filter out items that triggered transmission detection before checking for engine oil
   const engineItems = (items||[]).filter(i => {
     const d = (i.desc||'').toLowerCase();
-    return !/\batf\b|cvt|transmisi[oó]n/.test(d);
+    // Exclude transmission-related items (also covers typo "trasmision")
+    return !/\batf\b|cvt|trasmisi[oó]n|transmisi[oó]n/.test(d);
   });
   const engineDescs = engineItems.map(i => (i.desc||'').toLowerCase()).join(' ');
   if(/aceite\s*(de\s*)?(motor|engin|sintet|semisint|mineral)|filtro\s*(de\s*)?aceite|filtro\s*(de\s*)?motor|motor\s*(.*\s*)?filtro|cambio\s*(de\s*)?aceite|aceite\s*(.*\s*)?cambio|engine\s*oil|motor\s*oil/.test(engineDescs)) {
@@ -2066,7 +2076,6 @@ function calcNextService(fechaRealizado, kmRealizado, placa, maintType) {
   const unit = getKmUnit(placa);
   const intervalInUnit = unit === 'mi' ? Math.round(rule.km / 1.60934) : rule.km;
   const nextKm = kmRealizado ? Number(kmRealizado) + intervalInUnit : null;
-  console.log('[maint]', APP_VER, 'placa:', placa, 'unit:', unit, 'vn_keys:', Object.keys(db.vehicleNotes||{}), 'vn_placa:', (db.vehicleNotes||{})[placa], 'kmRealizado:', kmRealizado, 'intervalInUnit:', intervalInUnit, 'nextKm:', nextKm);
   return { nextDate, nextKm, rule };
 }
 
@@ -2262,13 +2271,7 @@ function saveVehicleNotes() {
     obs:         document.getElementById('vn-obs').value,
     kmunit:      document.getElementById('vn-kmunit').value || 'km',
   };
-  console.log('[vnotes] saved placa:', placa, db.vehicleNotes[placa]);
   saveLocal();
-  // Verify it was actually saved
-  try {
-    const check = JSON.parse(localStorage.getItem('autocheck_v2') || '{}');
-    console.log('[vnotes] verify localStorage kmunit:', check?.vehicleNotes?.[placa]?.kmunit);
-  } catch(e) {}
   document.getElementById('vnotes-overlay').classList.remove('open');
   toast('✅ Notas del vehículo guardadas');
 }
@@ -2699,6 +2702,63 @@ function renderMetrics() {
       <div class="n" style="font-size:20px;color:${k.c}">${k.n}</div>
       <div class="l">${k.l}</div>
     </div>`).join('');
+
+  // ── Metas mensuales ──
+  const metasBox = document.getElementById('metas-box');
+  if(metasBox) {
+    const metas = JSON.parse(localStorage.getItem('autocheck_metas')||'{}');
+    const metaFact  = Number(metas.facturacion||0);
+    const metaMO    = Number(metas.manoObra||0);
+    const metaCots  = Number(metas.cotizaciones||0);
+    const metaApro  = Number(metas.aprobadas||0);
+    function metaBar(valor, meta, color, fmt) {
+      if(!meta) return '';
+      const pct = Math.min(100, Math.round(valor/meta*100));
+      const c = pct>=100 ? '#059669' : pct>=60 ? '#d97706' : '#e53e3e';
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+          <span style="font-weight:600;color:var(--text1)">${fmt(valor)}</span>
+          <span style="color:var(--text3)">meta: ${fmt(meta)} &nbsp;<span style="font-weight:700;color:${c}">${pct}%</span></span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:10px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${c};border-radius:4px;transition:width 0.5s"></div>
+        </div>
+      </div>`;
+    }
+    const hayMeta = metaFact||metaMO||metaCots||metaApro;
+    metasBox.innerHTML = `
+      <div class="card" style="border-left:4px solid #7c3aed">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="section-label" style="margin:0">🎯 metas del período</div>
+          <button onclick="openMetasModal()" style="background:var(--surface2);border:none;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text1)">✏️ Editar</button>
+        </div>
+        ${hayMeta ? `
+          ${metaFact  ? `<div style="font-size:11px;color:var(--text3);margin-bottom:4px">💰 Facturación</div>${metaBar(totalIngr, metaFact, '#059669', v => '₡'+v.toLocaleString())}` : ''}
+          ${metaMO    ? `<div style="font-size:11px;color:var(--text3);margin-bottom:4px">🔧 Mano de obra</div>${metaBar(ingrMO, metaMO, '#e53e3e', v => '₡'+v.toLocaleString())}` : ''}
+          ${metaCots  ? `<div style="font-size:11px;color:var(--text3);margin-bottom:4px">📋 Cotizaciones</div>${metaBar(all.length, metaCots, '#2563eb', v => v+' cots')}` : ''}
+          ${metaApro  ? `<div style="font-size:11px;color:var(--text3);margin-bottom:4px">✅ Aprobadas / realizadas</div>${metaBar(aprobadas.length, metaApro, '#059669', v => v+' trabajos')}` : ''}
+        ` : `<div style="text-align:center;padding:14px 0;color:var(--text3);font-size:13px">
+          Sin metas configuradas.<br><button onclick="openMetasModal()" style="margin-top:8px;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer">Configurar metas</button>
+        </div>`}
+      </div>
+      <div id="metas-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeMetasModal()">
+        <div style="background:var(--surface1);border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;max-width:480px">
+          <div style="font-weight:700;font-size:16px;margin-bottom:14px">🎯 Metas del período</div>
+          <label style="font-size:12px;color:var(--text3)">Facturación total (₡)</label>
+          <input id="meta-facturacion" type="number" placeholder="ej. 500000" value="${metaFact||''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text1);font-size:14px;margin-bottom:10px">
+          <label style="font-size:12px;color:var(--text3)">Mano de obra (₡)</label>
+          <input id="meta-manoobra" type="number" placeholder="ej. 300000" value="${metaMO||''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text1);font-size:14px;margin-bottom:10px">
+          <label style="font-size:12px;color:var(--text3)">Cotizaciones emitidas</label>
+          <input id="meta-cotizaciones" type="number" placeholder="ej. 20" value="${metaCots||''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text1);font-size:14px;margin-bottom:10px">
+          <label style="font-size:12px;color:var(--text3)">Trabajos aprobados / realizados</label>
+          <input id="meta-aprobadas" type="number" placeholder="ej. 15" value="${metaApro||''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text1);font-size:14px;margin-bottom:16px">
+          <div style="display:flex;gap:10px">
+            <button onclick="closeMetasModal()" style="flex:1;padding:11px;border:none;border-radius:10px;background:var(--surface2);color:var(--text1);font-size:14px;cursor:pointer">Cancelar</button>
+            <button onclick="saveMetasModal()" style="flex:1;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Guardar</button>
+          </div>
+        </div>
+      </div>`;
+  }
 
   // ── Desglose financiero ──
   const finBox = document.getElementById('fin-box');
@@ -3638,6 +3698,27 @@ function addItemFromCatalog(catId) {
 }
 
 
+// ── METAS MODAL ──
+function openMetasModal() {
+  const m = document.getElementById('metas-modal');
+  if(m) { m.style.display = 'flex'; }
+}
+function closeMetasModal() {
+  const m = document.getElementById('metas-modal');
+  if(m) m.style.display = 'none';
+}
+function saveMetasModal() {
+  const metas = {
+    facturacion:  document.getElementById('meta-facturacion')?.value || '',
+    manoObra:     document.getElementById('meta-manoobra')?.value || '',
+    cotizaciones: document.getElementById('meta-cotizaciones')?.value || '',
+    aprobadas:    document.getElementById('meta-aprobadas')?.value || '',
+  };
+  localStorage.setItem('autocheck_metas', JSON.stringify(metas));
+  closeMetasModal();
+  renderMetrics();
+}
+
 // ── DARK MODE ──
 async function forceUpdate() {
   if(!confirm('¿Actualizar la app a la última versión?\n(Los datos guardados no se borran)')) return;
@@ -3813,8 +3894,7 @@ let deferredPrompt;
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(r => console.log('SW registered:', r.scope))
-      .catch(e => console.log('SW error:', e));
+      .catch(e => console.warn('SW error:', e));
   });
 }
 

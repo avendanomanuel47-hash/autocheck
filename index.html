@@ -872,9 +872,18 @@ async function syncNow() {
 async function pushToCloud(record) {
   if(!cloudMode) return false;
   try {
-    const payload = JSON.stringify({action: 'save', data: record, token: APP_TOKEN});
-    const url = scriptUrl + '?method=POST&payload=' + encodeURIComponent(payload);
-    appLog('INFO', `pushToCloud id=${record.id} cliente="${record.cliente}"`);
+    // Excluir foto del sync: puede ser varios KB de base64 que rompe la URL
+    const clean = Object.assign({}, record, { foto: '' });
+    const payload = JSON.stringify({action: 'save', data: clean, token: APP_TOKEN});
+    // Verificar que el payload no tenga caracteres que rompan la URL
+    let encoded;
+    try { encoded = encodeURIComponent(payload); }
+    catch(encErr) {
+      appLog('ERROR', `pushToCloud encodeURIComponent falló id=${record.id}`, encErr.message);
+      return false;
+    }
+    const url = scriptUrl + '?method=POST&payload=' + encoded;
+    appLog('INFO', `pushToCloud id=${record.id} cliente="${record.cliente}" payloadKB=${(encoded.length/1024).toFixed(1)}`);
     const res = await jsonp(url);
     const ok = !!(res && !res.error);
     if(ok) appLog('OK', `pushToCloud OK id=${record.id}`);
@@ -2044,7 +2053,7 @@ function reciboWhatsApp(id) {
 
 
 // ── APP LOG ──
-const APP_VER = 'v34';
+const APP_VER = 'v35';
 const _logBuf = [];
 function appLog(level, msg, data) {
   const ts = new Date().toLocaleTimeString('es-CR');

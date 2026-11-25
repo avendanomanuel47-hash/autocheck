@@ -868,14 +868,42 @@ async function syncNow() {
   setLoading(false);
 }
 
+// Limpia un string para que sea seguro en URLs: elimina caracteres de control
+// y reemplaza emojis/Unicode fuera del BMP que Apps Script no puede decodificar
+function sanitizeForUrl(str) {
+  if(typeof str !== 'string') return str;
+  return str
+    // Saltos de línea reales → espacio
+    .replace(/[\r\n\t]/g, ' ')
+    // Caracteres de control ASCII (0-31 excepto los anteriores)
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    // Emojis y caracteres fuera del BMP (surrogate pairs) → vacío
+    .replace(/[\uD800-\uDFFF]/g, '')
+    // Caracteres Unicode "privados" o raros que Apps Script no maneja
+    .replace(/[￰-￿]/g, '');
+}
+
+function sanitizeRecord(record) {
+  // Aplica sanitizeForUrl recursivamente a todos los strings del objeto
+  const r = JSON.parse(JSON.stringify(record)); // deep copy
+  function walk(obj) {
+    if(!obj || typeof obj !== 'object') return;
+    Object.keys(obj).forEach(k => {
+      if(typeof obj[k] === 'string') obj[k] = sanitizeForUrl(obj[k]);
+      else if(typeof obj[k] === 'object') walk(obj[k]);
+    });
+  }
+  walk(r);
+  return r;
+}
+
 // ── Envío directo a la nube (sin cola) — devuelve true/false según éxito real ──
 async function pushToCloud(record) {
   if(!cloudMode) return false;
   try {
-    // Excluir foto del sync: puede ser varios KB de base64 que rompe la URL
-    const clean = Object.assign({}, record, { foto: '' });
+    // Sanitizar y excluir foto (base64 rompe la URL)
+    const clean = sanitizeRecord(Object.assign({}, record, { foto: '' }));
     const payload = JSON.stringify({action: 'save', data: clean, token: APP_TOKEN});
-    // Verificar que el payload no tenga caracteres que rompan la URL
     let encoded;
     try { encoded = encodeURIComponent(payload); }
     catch(encErr) {
@@ -2053,7 +2081,7 @@ function reciboWhatsApp(id) {
 
 
 // ── APP LOG ──
-const APP_VER = 'v35';
+const APP_VER = 'v36';
 const _logBuf = [];
 function appLog(level, msg, data) {
   const ts = new Date().toLocaleTimeString('es-CR');
